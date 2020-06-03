@@ -1,0 +1,478 @@
+module K8sService;
+
+export *;
+
+import * from ABS.DC;
+import * from ABS.Scheduler;
+import * from K8sUtil;
+import * from K8sMaster;
+
+
+//
+// SERVICE
+//
+interface Service{
+  ServiceEndpoint getServiceEndpoint();
+
+  Unit deploy(NodeScheduler scheduler);
+
+  Int getSuccesses();
+  Int getFailures();
+
+  //fst = cpu , snd = memory
+  ServiceState getConsumption();
+
+  List<PodState> getPodsConsumptions();
+
+  String getName();
+  Rat getUpscaleThreshold();
+
+
+}
+class ServiceObject(ServiceConfig sConfig, PodConfig pConfig) implements Service{
+  ServiceLoadBalancer lb = null;
+  ServiceAutoscaler scaler = null;
+  ServiceEndpoint ep = null;
+
+  Unit deploy(NodeScheduler scheduler){
+    lb = new RRServiceLoadBalancer();
+    scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
+    ep = new ServiceEndpointObject(lb);
+    scaler.initialize();
+  }
+
+  ServiceEndpoint getServiceEndpoint(){
+    return this.ep;
+  }
+
+  Int getSuccesses(){
+    Fut<Int> r = ep!getSuccesses();
+    Int result = r.get;
+    return result;
+  }
+
+  Int getFailures(){
+    Fut<Int> r = ep!getFailures();
+    Int result = r.get;
+    return result;
+  }
+
+  ServiceState getConsumption(){
+    ServiceState cns = await lb!getConsumptions();
+    return cns;
+  }
+
+  List<PodState> getPodsConsumptions(){
+    //println("s.getPodsConsumptions() start");
+    List<PodState> list = await lb!getPodsConsumptions();
+    return list;
+  }
+
+  String getName(){
+    return name(sConfig);
+  }
+
+  Rat getUpscaleThreshold(){
+    return upscaleThreshold(sConfig);
+  }
+}
+
+
+//
+// POD
+//
+interface Pod {
+  Bool processRequest(Request request, Time started, Duration deadline);
+
+  Unit setBlocked();
+
+  Rat getCpuConsumption();
+  Rat getMemoryConsumption();
+  ResourcesMonitor getMonitor();
+
+  DC getDC();
+  Node getNode();
+  Unit setNode(Node n);
+  String getServiceName();
+  Int getID();
+
+  // wait before shut down.
+  Bool isIdle();
+
+}
+
+[Scheduler: reset_availCpu_scheduler(queue)] class PodObject(String serviceName, Int id, Rat compUnitSize, Rat cpuRequest, Rat cpuLimit, ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle) implements Pod {
+  Bool executing = False;
+  Bool blocked = False;
+
+  Node node = null;
+
+  //set to failureCooldown after a resetFailureState() invocation
+  Rat cooldown = 0;
+
+  // max cpu that the node can give to the pod (nodeCpu - otherPodsRequestedCpu)
+  Rat availableCpu = 0;
+
+  // number of active Requests, checked before shutting down the pod
+  Int activeRequests = 0;
+
+  Unit setNode(Node n){
+    this.node = n;
+    this!refreshAvailableCpu();
+  }
+
+  Unit refreshAvailableCpu(){
+
+    // sets max available cpu for this time unit
+    this.availableCpu = cpuLimit;
+    this.blocked = False;
+
+    await duration(refCycle,refCycle);
+    this!refreshAvailableCpu();
+  }
+
+  Bool processRequest(Request request, Time started, Duration deadline){
+    this.activeRequests = this.activeRequests + 1;
+    Rat cost = requestCost(request);
+    Rat requiredMemory = memory(request);
+
+    this.allocateMemory(requiredMemory);
+    monitor!consumedMemoryUpdate(requiredMemory);
+
+    //divide cost in units to be scheduled regardless of job cost
+    while (cost > 0){
+      // Lock
+      await !executing;
+      this.executing = True;
+
+      if (cost >= compUnitSize){
+        await this.availableCpu > 0;
+        await node!consumeCpu(compUnitSize,this);
+
+        await !this.blocked;
+
+        availableCpu = availableCpu - compUnitSize;
+        monitor!consumeCpu(compUnitSize);
+
+        cost = cost - compUnitSize;
+      } else if (cost > 0){
+        await this.availableCpu > 0;
+        await node!consumeCpu(cost,this);
+        await !this.blocked;
+
+        availableCpu = availableCpu - 1;
+        monitor!consumeCpu(cost);
+        cost = 0;
+      }
+      this.executing = False;
+      suspend;
+    }
+
+    this.releaseMemory(requiredMemory);
+    monitor!consumedMemoryUpdate(-requiredMemory);
+
+    Rat spentTime = timeDifference(now(),started);
+    Bool success = (spentTime <= durationValue(deadline));
+
+    this.activeRequests = this.activeRequests - 1;
+    return success;
+  }
+
+  Unit setBlocked(){
+    this.blocked = True;
+  }
+
+  // Loops until enough memory is given,
+  Rat allocateMemory(Rat requiredMemory){
+    Bool memoryAllocated = False;
+    Rat givenMemory = 0;
+
+    while (!memoryAllocated){
+      givenMemory = this.decrementMemory(requiredMemory);
+      if (givenMemory > 0){
+        memoryAllocated = True;
+      } else {
+        await duration(insufficientMemCooldown,insufficientMemCooldown);
+      }
+
+    }
+
+    return givenMemory;
+  }
+
+  Rat decrementMemory(Rat amount){
+    Rat mem = await node!allocateMemory(amount);
+    return mem;
+  }
+
+  Rat releaseMemory(Rat amount){
+    Rat v = await node!releaseMemory(amount);
+    return v;
+  }
+
+  Rat getCpuConsumption(){
+    Rat value = await monitor!cpuConsumption();
+    return value;
+  }
+
+  Rat getMemoryConsumption(){
+    Rat value = await this.monitor!memoryConsumption();
+    return value;
+  }
+
+  ResourcesMonitor getMonitor(){
+    return this.monitor;
+  }
+
+  Bool isIdle(){
+    await this.activeRequests == 0;
+    return True;
+  }
+
+  DC getDC(){ return thisDC();}
+  String getServiceName(){ return this.serviceName;}
+  Int getID(){ return this.id; }
+  Node getNode(){return this.node; }
+
+}
+
+//
+// LOAD BALANCER
+//
+interface ServiceLoadBalancer{
+
+  Pod getPod();
+  Unit addPod(Pod p, ResourcesMonitor rm);
+  Unit removePod(Pod p);
+  List<Pair<Pod,ResourcesMonitor>> getPods();
+  // Returns the total consumptions for the Service
+  ServiceState getConsumptions();
+  //Returns a List of PodStates
+  List<PodState> getPodsConsumptions();
+}
+
+class RRServiceLoadBalancer implements ServiceLoadBalancer{
+  //List of all the pods
+  List<Pair<Pod,ResourcesMonitor>> pods = list[];
+  //List to consider for scheduling, suspended pods not included
+  List<Pod> activePods = list[];
+
+  Pod getPod(){
+    Bool found = False;
+    Int count = 0;
+    Int nPods = length(activePods);
+
+    Pod p = null;
+
+    while (!found && count < nPods){
+      p = head(activePods);
+      activePods = tail(activePods);
+      activePods = appendright(activePods,p);
+
+      found = True;
+    }
+
+    return p;
+  }
+
+  Unit addPod(Pod p, ResourcesMonitor rm){
+    pods = appendright(pods,Pair(p,rm));
+    activePods = Cons(p,activePods);
+  }
+
+  Unit removePod(Pod p){
+    Pair<Pod,ResourcesMonitor> pair = Pair(null,null);
+
+    foreach (pr in pods){
+      if (fst(pr) == p){
+        pair = pr;
+      }
+    }
+    activePods = without(activePods,p);
+
+    await p!isIdle();
+    pods = without(pods,pair);
+  }
+
+  // returns a shallow copy of pods list
+  List<Pair<Pod,ResourcesMonitor>> getPods(){
+    List<Pair<Pod,ResourcesMonitor>> result = list[];
+
+    foreach (p in pods){
+      result = appendright(result, p);
+    }
+
+    return result;
+  }
+
+  ServiceState getConsumptions(){
+    Rat cpu = 0;
+    Rat memory = 0;
+    Rat ratio = 0;
+
+    foreach (p in pods){
+      ResourcesMonitor rm = snd(p);
+
+      Rat c = await rm!cpuConsumption();
+      Rat m = await rm!memoryConsumption();
+      Rat r = await rm!cpuConsumptionRatio();
+
+      cpu = cpu + c;
+      memory = memory + m;
+      ratio = ratio + r;
+    }
+
+    ratio = ratio / length(pods);
+
+    return ServiceState(cpu,memory,ratio);
+  }
+
+  List<PodState> getPodsConsumptions(){
+    List<PodState> stateList = list[];
+
+    foreach (p in pods){
+      ResourcesMonitor rm = snd(p);
+      PodState ps = await rm!getPodState();
+      stateList = appendright(stateList,ps);
+    }
+
+    return stateList;
+  }
+}
+
+//
+// AUTOSCALER
+//
+interface ServiceAutoscaler{
+  Unit initialize();
+}
+//
+class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, ServiceConfig sConfig, PodConfig pConfig) implements ServiceAutoscaler{
+  Int nextID = 0;
+  Int maxPods = 0;
+  Int minPods = 0;
+  Int nPods = 0;
+  Rat cycle = 0;
+
+  // Scaling thresholds and time periods
+  Rat upscaleThreshold = 0;
+  Rat downscaleThreshold = 0;
+  // how many time units below the threshold to scale down
+  Int downscalePeriod = 0;
+  Int underDsThresholdCounter = 0;
+
+  {
+    maxPods = maxPods(sConfig);
+    minPods = minPods(sConfig);
+    cycle = scalerCycle(sConfig);
+    upscaleThreshold = upscaleThreshold(sConfig);
+    downscaleThreshold = downscaleThreshold(sConfig);
+    downscalePeriod = downscalePeriod(sConfig);
+  }
+
+  Unit initialize(){
+    Int ctr = 0;
+    Int nStartingPods = startingPods(sConfig);
+    while (ctr < nStartingPods) {
+      this.launchPod();
+      ctr=ctr+1;
+    }
+    println("[Time: "+toString(timeValue(now()))+"] ***********INIT: CREATED "+toString(nStartingPods)+" PODS");
+    this!resize();
+  }
+
+  Unit resize(){
+
+    ServiceState ss = await lb!getConsumptions();
+
+    Rat serviceRatio = cpuRatio(ss);
+
+    if (serviceRatio < downscaleThreshold){
+      underDsThresholdCounter = underDsThresholdCounter + 1;
+    } else {
+      underDsThresholdCounter = 0;
+    }
+
+    await duration(cycle, cycle);
+
+    if (serviceRatio >= upscaleThreshold && nPods < maxPods){
+      Int nOfNewPods = truncate(serviceRatio / upscaleThreshold);
+      if (nPods + nOfNewPods > maxPods){
+        nOfNewPods = maxPods - nPods;
+      }
+      while (nOfNewPods > 0){
+        await this!launchPod();
+        nOfNewPods = nOfNewPods - 1;
+      }
+    }
+
+    if (underDsThresholdCounter >= downscalePeriod && nPods > minPods){
+      List<Pair<Pod,ResourcesMonitor>> l = await lb!getPods();
+      this!shutdownPod(head(l));
+    }
+
+    //println("Ended resize()");
+    this!resize();
+  }
+
+
+  Unit launchPod(){
+    ResourcesMonitor rm = new ResourcesMonitorObject(name(sConfig), this.nextID, monitorCycle(pConfig),cpuRequest(pConfig));
+    Pod p = new PodObject(name(sConfig), this.nextID, compUnitSize(pConfig), cpuRequest(pConfig), cpuLimit(pConfig), rm, memoryCooldown(pConfig), 1);
+
+    rm!setPod(p);
+    Node n = await scheduler!deployPod(p,rm);
+    p!setNode(n);
+    rm!setNode(n);
+    lb!addPod(p,rm);
+
+    this.nextID = this.nextID + 1;
+    this.nPods = this.nPods + 1;
+  }
+
+  Unit shutdownPod(Pair<Pod,ResourcesMonitor> p){
+    ResourcesMonitor rm = snd(p);
+    Node n = await rm!getNode();
+
+    await lb!removePod(fst(p));
+    n!removePod(fst(p),snd(p));
+
+    this.nPods = this.nPods - 1;
+  }
+}
+
+//
+// SERVICE ENDPOINT
+//
+interface ServiceEndpoint {
+  Bool invokeService(Request request, Duration deadline);
+
+  Int getSuccesses();
+  Int getFailures();
+}
+class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
+  Int successes = 0;
+  Int failures = 0;
+
+  Bool invokeService(Request request, Duration deadline){
+    Time started = now();
+    Pod p = await lb!getPod();
+    Bool success = await p!processRequest(request, now(), deadline);
+
+    if (success){
+      successes = successes + 1;
+    } else {
+      failures = failures + 1;
+    }
+
+    return success;
+  }
+
+  Int getSuccesses(){
+    return this.successes;
+  }
+
+  Int getFailures(){
+    return this.failures;
+  }
+}

@@ -1,0 +1,391 @@
+module K8sUtil;
+
+export *;
+
+import * from K8sService;
+import * from ABS.Scheduler;
+import * from ABS.DC;
+import * from K8sMaster;
+
+type RequestType = String;
+type ConsumptionMap = Map<Int,Rat>;
+
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory);
+
+data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
+
+data PodConfig = PodConfig(Rat compUnitSize, Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit);
+data ServiceConfig = ServiceConfig(String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle, Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod);
+
+data PodState = PodState(String serviceName, Int podID, String nodeName, Rat cpuConsumption, Rat memoryConsumption, Rat consumptionRatio);
+data NodeState = NodeState(String nName, Int nOfPods, Rat cpuLoad, Rat allocatedMemory, Rat totalCpu, Rat totalMemory, Rat requestedCpu);
+//UTILITIES
+
+// scheduler to have the resourcesRefresh method executed as first method every new time unit,
+// should guarantee more precise values.
+def Process res_refresh_scheduler(List<Process> queue) =
+  let List<Process> monitors = filter((Process x) => method(x) == "resourcesRefresh") (queue) in
+    when (!isEmpty(monitors))// a < b
+      then head(monitors) else head(queue);
+
+def Process reset_availCpu_scheduler(List<Process> queue) =
+  let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue) in
+    when (!isEmpty(refresh))
+      then head(refresh) else head(queue);
+
+// node scheduler, last method executed is resetResources, after all cpu consumptions of the time unit.
+def Process node_reset_resources_scheduler(List<Process> queue) =
+  let List<Process> others = filter((Process x) => method(x) == "resetResources") (queue) in
+    when (!isEmpty(others))// a < b
+      then head(others) else head(queue);
+//extract value from a InfRat (when calling total() on a DC)
+def Rat infRatValue(InfRat x) =
+  case x {
+    Fin(y) => y
+    | _ => 0
+  };
+
+def Rat maybeZero(Maybe<Rat> x) =
+  case x {
+    Just(y) => y
+    | _ => 0
+  };
+
+
+//
+// POD RESOURCE MONITOR
+//
+interface ResourcesMonitor{
+  Rat cpuConsumption();
+  Rat memoryConsumption();
+  Rat cpuConsumptionRatio();
+  Rat getCpuRequest();
+
+  Unit consumeCpu(Rat value);
+  Unit consumedMemoryUpdate(Rat value);
+
+  Unit setPod(Pod p);
+  Unit shutdown();
+
+  PodState getPodState();
+  Node getNode();
+  Unit setNode(Node n);
+}
+
+//id: id of the monitored element
+//cycle: refresh period, determines resource/cycle consumption
+[Scheduler: res_refresh_scheduler(queue)] class ResourcesMonitorObject(String serviceName, Int id, Rat cycle, Rat cpuRequest) implements ResourcesMonitor{
+  String nodeName = "";
+  //modified during the time period by running processes
+  Rat cpu = 0;
+  Rat memoryChange = 0;
+  Pod pod;
+  Node node = null;
+
+  //Returned values, updated every refresh
+  Rat cpuDisplay = 0;
+  Rat memoryDisplay = 0;
+  // cpuConsumption / cpuPerPod given by the node.
+  Rat cpuConsumptionRatio = 0;
+
+  //consumption history maps
+  ConsumptionMap cpuConsumptionMap = map[];
+  ConsumptionMap cpuRatioMap = map[];
+
+  // becomes True when the pod is shutted down
+  Bool shutdown = False;
+
+  Unit setNode(Node n){
+    this.node = n;
+    this.nodeName = await node!getName();
+    this!resourcesRefresh();
+  }
+
+  Unit resourcesRefresh(){
+    // time to store in map, -1 because the value stored at each time unit is calculated for the previous time unit.
+    Int time = truncate(timeValue(now())) - 1;
+
+    // compute values
+    this.cpuConsumptionRatio = cpu / cpuRequest;
+    cpuDisplay = cpu;
+
+    // store in map
+    this.cpuConsumptionMap = put(cpuConsumptionMap,time,cpuDisplay);
+    this.cpuRatioMap = put(cpuRatioMap,time,cpuConsumptionRatio);
+
+    // reset cpu counter
+    cpu = 0;
+
+    //println("updating memoryDisplay , old val: " + toString(memoryDisplay) + " new val: "+ toString(memoryDisplay + memoryChange));
+    memoryDisplay = memoryDisplay + memoryChange;
+    memoryChange = 0;
+
+    //println("monitor.resourceRefresh(): before await");
+    //refre
+    //this.pod!setRefreshed(True);
+
+    await duration(cycle,cycle);
+    //refreshed false
+    if (!this.shutdown){
+      this!resourcesRefresh();
+    }
+  }
+
+  Rat cpuConsumption(){
+    //println("started monitor.cpuConsumption()");
+    return this.cpuDisplay;
+  }
+
+  Rat memoryConsumption(){
+    //println("started monitor.memoryConsumption()");
+    return this.memoryDisplay;
+  }
+
+  Rat cpuConsumptionRatio(){
+    return this.cpuConsumptionRatio;
+  }
+
+  Rat getCpuRequest(){
+    return cpuRequest;
+  }
+
+  Unit consumeCpu(Rat value){
+
+    this.cpu = this.cpu + value;
+  }
+
+  Unit consumedMemoryUpdate(Rat mValue){
+    //println("updating memChange , old val: " + toString(memoryChange) + " new val: "+ toString(this.memoryChange + mValue));
+    this.memoryChange = this.memoryChange + mValue;
+  }
+
+  PodState getPodState(){
+    //println("getPodState: memoryDisplay value: " + toString(this.memoryDisplay));
+    PodState ps = PodState(this.serviceName, this.id, this.nodeName, this.cpuDisplay, this.memoryDisplay, this.cpuConsumptionRatio);
+
+    return ps;
+  }
+
+  Node getNode(){
+    return this.node;
+  }
+
+  Unit setPod(Pod p){
+    this.pod = p;
+  }
+
+  Unit shutdown(){
+    this.shutdown = True;
+  }
+
+}
+
+//
+// NODE RESOURCE MONITOR
+//
+interface NodeResourcesMonitor{
+  Rat cpuConsumption();
+  Rat memoryConsumption();
+
+  Unit setConsumedCpu(Rat value);
+  Unit setConsumedMemory(Rat value);
+  Unit setRequestedCpu(Rat value);
+
+  Unit setNode(Node n);
+
+  NodeState getNodeState();
+
+  // consumption history map methods
+  // retrieve average consumption in the last 'period' time units:
+  //  from 'now - 1' to 'now - period'
+  //  example: called on time: 10 with period: 3 will return average load of times 7,8,9.
+  Rat getAverageLoad(Int period);
+  Map<Int,Rat> getConsumptionMap();
+}
+class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) implements NodeResourcesMonitor{
+  //modified during the time period by running processes
+  Rat cpu = 0;
+  Rat memoryChange = 0;
+  Node node;
+  String nodeName = "";
+
+  //Returned values, updated every refresh
+  Rat cpuDisplay = 0;
+  Rat memoryDisplay = 0;
+  Rat requestedCpu = 0;
+
+  // consumption history map
+  Map<Int,Rat> consumptionMap = map[];
+
+  Rat cpuConsumption(){
+    return this.cpuDisplay;
+  }
+
+  Rat memoryConsumption(){
+    return this.memoryDisplay;
+  }
+
+  Unit setConsumedCpu(Rat value){
+    this.cpuDisplay = value;
+
+    //update consumption history map
+    Int time = truncate(timeValue(now()));
+    this.consumptionMap = put(this.consumptionMap,time,value);
+  }
+
+  Unit setConsumedMemory(Rat value){
+    this.memoryDisplay = value;
+  }
+
+  Unit setRequestedCpu(Rat value){
+    this.requestedCpu = value;
+  }
+
+  NodeState getNodeState(){
+    List<Pod> pods = await node!getPods();
+    NodeState ns = NodeState(this.nodeName, length(pods), this.cpuDisplay, this.memoryDisplay, this.totalCpu, this.totalMemory, this.requestedCpu);
+
+    return ns;
+  }
+
+  Unit setNode(Node n){
+    this.node = n;
+    this.nodeName = await node!getName();
+  }
+
+  Rat getAverageLoad(Int period){
+    Int time = truncate(timeValue(now())) - 1;
+    Int ctr = 0;
+    Rat result = 0;
+
+    while ((time > 0) && (period > 0)){
+      Rat consumption = maybeZero(lookup(this.consumptionMap,time));
+      result = result + consumption;
+
+      ctr = ctr + 1;
+      time = time - 1;
+      period = period - 1;
+    }
+
+    if (ctr > 0){
+      result = result / ctr;
+    }
+
+    return result;
+  }
+
+  ConsumptionMap getConsumptionMap(){
+    return this.consumptionMap;
+  }
+}
+
+//
+// PRINTER
+//
+interface Printer{
+  Unit printNodesStates(List<NodeState> list);
+  Unit printServiceStatus(Service s);
+
+  Unit printNodes(Master m, Int times, Rat interval);
+  Unit printService(Service s, Int times, Rat interval);
+
+  // print master and services status
+  Unit printStatus(Master m, List<Service> sList, Int times, Rat interval);
+
+  // print a portion of a history map
+  Unit printMap(Pair<String,ConsumptionMap> map, Int tFrom, Int tTo);
+  Unit printMaps(List<Pair<String,ConsumptionMap>> maps, Int tFrom, Int tTo);
+
+}
+class PrinterObject() implements Printer {
+
+  Unit printNodesStates(List<NodeState> list){
+    println("MASTER STATUS:");
+    
+    foreach (state in list){
+      println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
+              "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
+              "   Requested Cpu : " + toString(requestedCpu(state)) + " / " + toString(totalCpu(state)) +
+              "   Allocated Memory : " + toString(allocatedMemory(state)) + " / " + toString(totalMemory(state))
+              );
+    }
+    println("");
+  }
+
+  Unit printServiceStatus(Service s){
+    String serviceName = await s!getName();
+    ServiceState consumptions = await s!getConsumption();
+    Rat upscaleThreshold = await s!getUpscaleThreshold();
+    List<PodState> list = await s!getPodsConsumptions();
+    println("SERVICE " + serviceName + " STATUS:");
+    println("TOTAL  CPU: " + toString(cpuCsmpt(consumptions)) + "  UTIL %: " + toString(truncate(cpuRatio(consumptions) * 100)) + " / " + toString(truncate(upscaleThreshold * 100)) + "   MEMORY: " + toString(memoryCsmpt(consumptions)));
+    foreach (state in list){
+      println("Pod: " + toString(podID(state)) +
+              "   Node : " + toString(nodeName(state)) +
+              "   Cpu Consumption: " + toString(cpuConsumption(state)) +
+              "   Allocated Memory : " + toString(memoryConsumption(state)) +
+              "   Cpu % : " + toString(truncate(consumptionRatio(state) * 100))
+              );
+    }
+    println("");
+  }
+
+
+  Unit printNodes(Master m, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      List<NodeState> list = await m!getNodesStates();
+      this.printNodesStates(list);
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printService(Service s, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      this.printServiceStatus(s);
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printStatus(Master m, List<Service> sList, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      println("----------------------------- TIME " + toString(timeValue(now())) + " -----------------------------");
+      List<NodeState> list = await m!getNodesStates();
+      this.printNodesStates(list);
+      foreach (s in sList){
+        this.printServiceStatus(s);
+      }
+      println("------------------------------------------------------------------");
+      println("");
+
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printMap(Pair<String,ConsumptionMap> map, Int tFrom, Int tTo){
+    println(fst(map) + " MAP:");
+    while (tFrom <= tTo){
+      Rat v = lookupDefault(snd(map),tFrom,-1);
+
+      if (v >= 0){
+        println("Time: " + toString(tFrom) + "  Val: " + toString(v));
+      }
+
+      tFrom = tFrom + 1;
+    }
+  }
+
+  Unit printMaps(List<Pair<String,ConsumptionMap>> maps, Int tFrom, Int tTo){
+    foreach (m in maps){
+      this.printMap(m,tFrom,tTo);
+    }
+  }
+}

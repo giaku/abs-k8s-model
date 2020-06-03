@@ -1,0 +1,297 @@
+module K8sMaster;
+
+export *;
+
+import * from ABS.DC;
+import * from K8sService;
+import * from K8sUtil;
+import * from ABS.Scheduler;
+
+
+//
+// MASTER
+//
+interface Master{
+  Bool deployService(Service s);
+
+  List<NodeState> getNodesStates();
+
+  List<Pair<String,ConsumptionMap>> getNodesMap();
+
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory);
+}
+class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implements Master{
+  NodeScheduler scheduler;
+
+  {
+    scheduler = new NodeSchedulerObject(cp,loadPeriod,resourceCycle);
+  }
+
+  Bool deployService(Service s){
+    await s!deploy(scheduler);
+    return True;
+  }
+
+  List<NodeState> getNodesStates(){
+    List<NodeState> list = await scheduler!getNodeStates();
+    return list;
+  }
+
+  List<Pair<String,ConsumptionMap>> getNodesMap(){
+    List<Pair<String,ConsumptionMap>> result = list[];
+    List<Node> nList = await scheduler!getNodes();
+
+    foreach (n in nList){
+      NodeResourcesMonitor nMonitor = await n!getMonitor();
+      String nodeName = await n!getName();
+      ConsumptionMap map = await nMonitor!getConsumptionMap();
+
+      result = appendright(result,Pair(nodeName,map));
+    }
+
+    return result;
+  }
+
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory){
+    await this.scheduler!createNodes(nNodes,cpu,memory);
+    return True;
+  }
+}
+
+//
+// NODE
+//
+interface Node{
+  String getName();
+  NodeResourcesMonitor getMonitor();
+  //Use Node cpu, equivalent to [Cost: amount] skip;
+  Bool consumeCpu(Rat amount,Pod p);
+
+  Rat allocateMemory(Rat amount);
+  Rat releaseMemory(Rat amount);
+
+  Unit addPod(Pod p, ResourcesMonitor rm);
+  Unit removePod(Pod p, ResourcesMonitor rm);
+
+  List<Pod> getPods();
+
+  Rat getRequestedCpu();
+  Rat getAvailableCpu();
+}
+[Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Int cycle, NodeResourcesMonitor monitor) implements Node{
+  List<ResourcesMonitor> pMonitors = list[];
+  List<Pod> pods = list[];
+  String name = "";
+  Bool refreshed = False;
+  Bool memoryLock = False;
+  Bool computing = False;
+
+  Rat availableCpu = 0;
+  Rat availableMemory = 0;
+
+  Rat requestedCpu = 0;
+
+  {
+    this.name = ("Node-" + toString(id));
+    availableCpu = cpu;
+    availableMemory = memory;
+    this!resetResources();
+  }
+
+  String getName(){
+    return this.name;
+  }
+
+  List<Pod> getPods(){
+    return this.pods;
+  }
+
+  NodeResourcesMonitor getMonitor(){
+    return this.monitor;
+  }
+
+  // Sets the consumptions on the monitor and reset the availableCpu to the full value.
+  // this method is the last method called by the scheduler every time unit.
+  Unit resetResources(){
+
+    monitor!setConsumedCpu(cpu - availableCpu);
+    monitor!setConsumedMemory(memory - availableMemory);
+
+    availableCpu = cpu;
+
+    await duration(cycle,cycle);
+
+    this!resetResources();
+  }
+
+  Bool consumeCpu(Rat amount,Pod p){
+    Bool result = False;
+
+    await this.availableCpu > 0;
+
+    while (!result){
+      if (availableCpu >= amount){
+        availableCpu = availableCpu - amount;
+        result = True;
+      } else {
+        println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
+        amount = amount - availableCpu;
+        availableCpu = 0;
+        println("blocking pod: " + toString(p));
+        p!setBlocked();
+        await this.availableCpu > 0;
+      }
+    }
+
+    return result;
+  }
+
+  Rat allocateMemory(Rat amount){
+    Rat givenMemory = 0;
+    await !this.memoryLock;
+    this.memoryLock = True;
+
+    if (availableMemory >= amount){
+      availableMemory = availableMemory - amount;
+      givenMemory = amount;
+    }
+
+    this.memoryLock = False;
+
+    return givenMemory;
+
+  }
+
+  Rat releaseMemory(Rat amount){
+    Rat releasedMemory = 0;
+    await !this.memoryLock;
+
+    this.memoryLock = True;
+    availableMemory = availableMemory + amount;
+    this.memoryLock = False;
+
+    releasedMemory = amount;
+
+    return releasedMemory;
+  }
+
+  Unit addPod(Pod p, ResourcesMonitor rm){
+    Rat reqCpu = await rm!getCpuRequest();
+    this.pMonitors = appendright(this.pMonitors,rm);
+    this.pods = appendright(this.pods,p);
+
+    this.requestedCpu = this.requestedCpu + reqCpu;
+    monitor!setRequestedCpu(this.requestedCpu);
+  }
+
+  Unit removePod(Pod p, ResourcesMonitor rm){
+    Rat reqCpu = await rm!getCpuRequest();
+    this.pMonitors = without(this.pMonitors,rm);
+    this.pods = without(this.pods,p);
+
+    this.requestedCpu = this.requestedCpu - reqCpu;
+    monitor!setRequestedCpu(this.requestedCpu);
+  }
+
+  List<ResourcesMonitor> getPMonitors(){
+    return this.pMonitors;
+  }
+
+  Rat getRequestedCpu(){
+    return this.requestedCpu;
+  }
+
+  Rat getAvailableCpu(){
+    return this.cpu - this.requestedCpu;
+  }
+}
+
+//
+// NODE BALANCER
+//
+interface NodeScheduler{
+  //create nNodes with given cpu and memory amounts.
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory);
+
+  List<NodeState> getNodeStates();
+  List<Node> getNodes();
+
+  Node deployPod(Pod p,ResourcesMonitor rm);
+}
+
+//loadPeriod: period to consider to select the less loaded node
+class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle) implements NodeScheduler{
+  // static list of all the nodes
+  List<Node> nodes = list[];
+  // list used to schedule new pods, can change order
+  List<Node> activeNodes = list[];
+  Int nextID = 0;
+
+  // pod deploy lock
+  Bool deploying = False;
+
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory){
+    Int ctr = 0;
+    while (ctr < nNodes) {
+      NodeResourcesMonitor monitor = new NodeResourcesMonitorObject(resourceCycle,cpu,memory);
+      Node node = new NodeObject(nextID, cpu, memory, resourceCycle, monitor);
+      await monitor!setNode(node);
+      nodes = appendright(nodes,node);
+      activeNodes = appendright(activeNodes,node);
+      this.nextID = nextID + 1;
+      ctr = ctr + 1;
+    }
+    println("[Time: "+toString(timeValue(now()))+"] *********** CREATED "+toString(nNodes)+" NODES [CPU: " + toString(cpu) + " - " + "MEMORY: " + toString(memory) + " ]");
+    return True;
+  }
+
+  //returns the node with more not requested cpu available
+  Node deployPod(Pod p, ResourcesMonitor rm){
+    Bool deployed = False;
+    Rat requestedCpu = await rm!getCpuRequest();
+    Node result = null;
+
+    while (!deployed){
+      await !deploying;
+      this.deploying = True;
+      result =  head(activeNodes);
+      Rat maxCpu = await result!getAvailableCpu();
+      List<Node> nodesToCheck = tail(activeNodes);
+
+      foreach ( n in nodesToCheck){
+        Rat cpu = await n!getAvailableCpu();
+        if (cpu > maxCpu){
+          maxCpu = cpu;
+          result = n;
+        }
+      }
+
+      if (maxCpu >= requestedCpu){
+        await result!addPod(p,rm);
+        this.deploying = False;
+        deployed = True;
+      }else{
+        this.deploying = False;
+        await duration(1,1);
+      }
+    }
+    return result;
+  }
+
+  List<NodeState> getNodeStates(){
+    List<NodeState> list = list[];
+
+    foreach (node in nodes){
+      NodeResourcesMonitor monitor = await node!getMonitor();
+      NodeState ns = await monitor!getNodeState();
+      list = appendright(list,ns);
+    }
+
+    return list;
+  }
+
+  List<Node> getNodes(){
+    return this.nodes;
+  }
+
+}
