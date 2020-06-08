@@ -22,8 +22,8 @@ Second we create as many worker nodes we need to reproduce our cluster infrastru
     
     Fut<Bool> fb = master!createNodes(numberOfNodes,cpu,memory);
     
-Now we need to deploy some services, we start with their configurations, scalerCyclePeriod is ..... .
-In the pod configuration monitorCyclePeriod and compUnitSize normally are set to 1, they are .... .
+Now we need to deploy our service, we start with its configuration, scalerCyclePeriod defines the frequency of the scheduler checks, i.e. how many intervals it should wait to check on the workload of the nodes, by default is 1.
+In the pod configuration monitorCyclePeriod and compUnitSize normally are set to 1, they repesctively control how often (in time intervals) the monitor refreshes the available cpu in the pod and how much cpu a pod consumes when it is scheduled to execute.
 
     ServiceConfig sConfig1 = ServiceConfig(name, numberOfPods, minPods, maxPods, scalerCyclePeriod, upscaleThreshold, downscaleThreshold, downscalePeriod);
     PodConfig pConfig1 = PodConfig(compUnitSize, monitorCyclePeriod, insufficientMemoryCooldown, cpuRequest, cpuLimit);
