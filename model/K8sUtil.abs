@@ -402,10 +402,10 @@ class NodeFailuresObj() implements NodeFailures {
     while (ctr > 0){
       //get nodes to call a change status method on each of them
       //List<NodeState> list = await m!getNodes();
-      
+
       foreach (n in sList){
         coin = random(100); // [0-99]
-        println("TOSSING COIN " + toString(coin) + " ---------");
+        //println("TOSSING COIN " + toString(coin) + " ---------");
         if (coin <= (prob*100)) {
           //n.changeStatus();
           println("------------STATUS CHANGED-----------");

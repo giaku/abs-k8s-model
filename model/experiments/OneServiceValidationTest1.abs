@@ -72,6 +72,8 @@ class ClientObjectHigh(ServiceEndpoint se, Request t) implements Client {
 
   printer!printStatus(master,sList,350,1);
 
+  NodeFailures nf = new NodeFailures(1/200, master.getNodes(), 350, 1);
+
   await duration(5,5);
 
   Int numOfclients = 50;

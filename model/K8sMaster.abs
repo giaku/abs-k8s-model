@@ -19,6 +19,7 @@ interface Master{
   List<Pair<String,ConsumptionMap>> getNodesMap();
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory);
+  List<Nodes> getNodes();
 }
 class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implements Master{
   NodeScheduler scheduler;
@@ -34,6 +35,11 @@ class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implemen
 
   List<NodeState> getNodesStates(){
     List<NodeState> list = await scheduler!getNodeStates();
+    return list;
+  }
+
+  List<Node> getNodes(){
+    List<Node> list = await scheduler!getNodes();
     return list;
   }
 
