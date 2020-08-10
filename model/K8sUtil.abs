@@ -301,7 +301,7 @@ class PrinterObject() implements Printer {
 
   Unit printNodesStates(List<NodeState> list){
     println("MASTER STATUS:");
-    
+
     foreach (state in list){
       println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
               "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
@@ -387,5 +387,33 @@ class PrinterObject() implements Printer {
     foreach (m in maps){
       this.printMap(m,tFrom,tTo);
     }
+  }
+}
+
+interface NodeFailures {
+  // randomly cause failures on nodes
+  Unit run(Rat prob, List<Node> nList, Int times, Rat interval);
+}
+
+class NodeFailuresObj() implements NodeFailures {
+  Unit run(Rat prob, List<Node> nList, Int times, Rat interval){
+    Int ctr = times;
+    Rat coin;
+    while (ctr > 0){
+      //get nodes to call a change status method on each of them
+      //List<NodeState> list = await m!getNodes();
+      
+      foreach (n in sList){
+        coin = random(100); // [0-99]
+        println("TOSSING COIN " + toString(coin) + " ---------");
+        if (coin <= (prob*100)) {
+          //n.changeStatus();
+          println("------------STATUS CHANGED-----------");
+        }
+      }
+
+      println("");
+      ctr = ctr - 1;
+      await duration(interval,interval);
   }
 }
