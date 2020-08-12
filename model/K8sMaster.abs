@@ -19,7 +19,7 @@ interface Master{
   List<Pair<String,ConsumptionMap>> getNodesMap();
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory);
-  List<Nodes> getNodes();
+  List<Node> getNodes();
 }
 class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implements Master{
   NodeScheduler scheduler;
