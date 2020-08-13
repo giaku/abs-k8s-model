@@ -83,6 +83,9 @@ interface Node{
 
   Rat getRequestedCpu();
   Rat getAvailableCpu();
+  Int getStatus();
+  Unit setStatus(Int status);
+
 }
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Int cycle, NodeResourcesMonitor monitor) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
@@ -91,7 +94,7 @@ interface Node{
   Bool refreshed = False;
   Bool memoryLock = False;
   Bool computing = False;
-
+  Int status = 0;
   Rat availableCpu = 0;
   Rat availableMemory = 0;
 
@@ -209,6 +212,14 @@ interface Node{
 
   Rat getAvailableCpu(){
     return this.cpu - this.requestedCpu;
+  }
+
+  Int getStatus(){
+    return this.status;
+  }
+
+  Unit setStatus(Int status){
+    this.status = status;
   }
 }
 

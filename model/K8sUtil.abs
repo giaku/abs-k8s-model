@@ -391,25 +391,35 @@ class PrinterObject() implements Printer {
   }
 }
 
+
 interface NodeFailures{
   // randomly cause failures on nodes
-  Unit run(Rat prob, List<Node> nList, Int times, Rat interval);
+  Unit run();
 }
 
-class NodeFailuresObj() implements NodeFailures {
-  Unit run(Rat prob, List<Node> nList, Int times, Rat interval){
+class NodeFailuresObj(Rat prob, Master master, Int times, Rat interval) implements NodeFailures {
+  Unit run(){
     Int ctr = times;
-    Rat coin;
+    Rat coin = 0;
     while (ctr > 0){
-      //get nodes to call a change status method on each of them
-      //List<NodeState> list = await m!getNodes();
+      //get nodes to toss a coin for each of them still alive
+      List<Node> nList = await master!getNodes();
 
       foreach (n in nList){
-        coin = random(100); // [0-99]
-        //println("TOSSING COIN " + toString(coin) + " ---------");
-        if (coin <= (prob*100)) {
-          //n.changeStatus();
-          println("------------STATUS CHANGED-----------");
+        coin = random(1000000); // [0-99]
+        Int s = await n!getStatus();//0->normal, 1->sick, 2->dead.
+        if (s != 2) {
+          if (coin <= (prob*1000000)) {
+            if (s == 0) {
+              n!setStatus(1);
+              //go sick
+              println("------------STATUS CHANGED +1 SICK -----------");
+            }
+            if (s == 1) {
+              n!setStatus(2);
+              println("------------STATUS CHANGED +1 DEAD -----------");
+            }
+          }
         }
       }
 
