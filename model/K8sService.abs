@@ -29,13 +29,13 @@ interface Service{
 
 
 }
-class ServiceObject(ServiceConfig sConfig, PodConfig pConfig) implements Service{
+class ServiceObject(ServiceConfig sConfig, PodConfig pConfig, ServiceLoadBalancerPolicy policy) implements Service{
   ServiceLoadBalancer lb = null;
   ServiceAutoscaler scaler = null;
   ServiceEndpoint ep = null;
 
   Unit deploy(NodeScheduler scheduler){
-    lb = new RRServiceLoadBalancer();
+    lb = new ServiceLoadBalancerObject(policy);
     scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
     ep = new ServiceEndpointObject(lb);
     scaler.initialize();
@@ -95,6 +95,7 @@ interface Pod {
   Unit setNode(Node n);
   String getServiceName();
   Int getID();
+  Int getActiveRequests();
 
   // wait before shut down.
   Bool isIdle();
@@ -229,6 +230,7 @@ interface Pod {
     return True;
   }
 
+  Int getActiveRequests(){return this.activeRequests;}
   DC getDC(){ return thisDC();}
   String getServiceName(){ return this.serviceName;}
   Int getID(){ return this.id; }
@@ -244,6 +246,7 @@ interface ServiceLoadBalancer{
   Pod getPod();
   Unit addPod(Pod p, ResourcesMonitor rm);
   Unit removePod(Pod p);
+  List<Pod> getActivePods();
   List<Pair<Pod,ResourcesMonitor>> getPods();
   // Returns the total consumptions for the Service
   ServiceState getConsumptions();
@@ -251,26 +254,14 @@ interface ServiceLoadBalancer{
   List<PodState> getPodsConsumptions();
 }
 
-class RRServiceLoadBalancer implements ServiceLoadBalancer{
+class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements ServiceLoadBalancer{
   //List of all the pods
   List<Pair<Pod,ResourcesMonitor>> pods = list[];
   //List to consider for scheduling, suspended pods not included
   List<Pod> activePods = list[];
 
   Pod getPod(){
-    Bool found = False;
-    Int count = 0;
-    Int nPods = length(activePods);
-
-    Pod p = null;
-
-    while (!found && count < nPods){
-      p = head(activePods);
-      activePods = tail(activePods);
-      activePods = appendright(activePods,p);
-
-      found = True;
-    }
+    Pod p = await policy!getPod(this);
 
     return p;
   }
@@ -303,6 +294,10 @@ class RRServiceLoadBalancer implements ServiceLoadBalancer{
     }
 
     return result;
+  }
+
+  List<Pod> getActivePods(){
+    return this.activePods;
   }
 
   ServiceState getConsumptions(){
@@ -456,8 +451,53 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
   Bool invokeService(Request request, Duration deadline){
     Time started = now();
-    Pod p = await lb!getPod();
-    Bool success = await p!processRequest(request, now(), deadline);
+
+    Int batchSize = batchSize(request);
+    Map<Pod,Int> scheduled = map[];
+
+    List<Fut<Bool>> successList = list[];
+    Bool success = True;
+
+    // divide the batch as single requests
+    while (batchSize > 0){
+      Pod p = await lb!getPod();
+
+      Int currentValue = lookupDefault(scheduled, p, -1);
+
+      if (currentValue != -1){
+        currentValue = currentValue + 1;
+        scheduled = put(scheduled, p, currentValue);
+      } else {
+        scheduled = insert(scheduled, Pair(p,1));
+      }
+
+      batchSize = batchSize - 1;
+    }
+
+    foreach (p in keys(scheduled)) {
+      // create sortedRequest multipling costs per ratio
+      Int nOfReq = lookupDefault(scheduled, p, 0);
+      Rat reqRatio = nOfReq / batchSize(request);
+      Rat requestCost = requestCost(request) * reqRatio;
+      Rat requestMemory = memory(request) * reqRatio;
+      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
+
+      //call processRequest and insert the result in the list of future bool
+      Fut<Bool> succ = p!processRequest(sortedRequest, now(), deadline);
+      successList = insert(successList,succ);
+    }
+
+    Int nOfCalls = length(successList);
+
+    while (success == True && nOfCalls > 0){
+      Fut<Bool> b = head(successList);
+      await b?;
+      Bool res = b.get;
+
+      success = success && res;
+      successList = tail(successList);
+      nOfCalls = nOfCalls - 1;
+    }
 
     if (success){
       successes = successes + 1;
@@ -474,5 +514,67 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
   Int getFailures(){
     return this.failures;
+  }
+}
+
+//
+// LOADBALANCER POLICIES
+//
+interface ServiceLoadBalancerPolicy {
+  Pod getPod(ServiceLoadBalancer lb);
+}
+class RandomLbPolicy() implements ServiceLoadBalancerPolicy {
+  Pod getPod(ServiceLoadBalancer lb){
+    List<Pod> activePods = lb.getActivePods();
+
+    Int nPods = length(activePods);
+    Int chosen = random(nPods);
+    Pod p = nth(activePods,chosen);
+
+    return p;
+  }
+}
+
+class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
+  Pod getPod(ServiceLoadBalancer lb){
+    List<Pod> activePods = lb.getActivePods();
+
+    Int nPods = length(activePods);
+
+    Pod p = null;
+
+    if (nPods > 0){
+      p = head(activePods);
+      activePods = tail(activePods);
+      activePods = appendright(activePods,p);
+    }
+
+    return p;
+  }
+}
+
+class WeightedLeastReqLbPolicy() implements ServiceLoadBalancerPolicy {
+  Pod getPod(ServiceLoadBalancer lb){
+    List<Pod> activePods = lb.getActivePods();
+    // randomly choose first pod
+    Int nPods = length(activePods);
+    Int chosen = random(nPods);
+    Pod p1 = nth(activePods,chosen);
+
+    // randomly choose second pod
+    List<Pod> remainingPods = without(activePods,p1);
+
+    Int nPods = nPods - 1;
+    Int chosen = random(nPods);
+    Pod p2 = nth(remainingPods,chosen);
+
+    Int reqP1 = await p1!getActiveRequests();
+    Int reqP2 = await p2!getActiveRequests();
+
+    if (reqP1 < reqP2){
+      return p1;
+    } else {
+      return p2;
+    }
   }
 }

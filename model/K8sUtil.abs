@@ -10,7 +10,7 @@ import * from K8sMaster;
 type RequestType = String;
 type ConsumptionMap = Map<Int,Rat>;
 
-data Request = Request(RequestType requestType, Rat requestCost, Rat memory);
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize);
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
@@ -301,7 +301,7 @@ class PrinterObject() implements Printer {
 
   Unit printNodesStates(List<NodeState> list){
     println("MASTER STATUS:");
-    
+
     foreach (state in list){
       println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
               "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
