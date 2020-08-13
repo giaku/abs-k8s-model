@@ -202,6 +202,7 @@ interface NodeResourcesMonitor{
   Rat getAverageLoad(Int period);
   Map<Int,Rat> getConsumptionMap();
 }
+
 class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) implements NodeResourcesMonitor{
   //modified during the time period by running processes
   Rat cpu = 0;
@@ -390,7 +391,7 @@ class PrinterObject() implements Printer {
   }
 }
 
-interface NodeFailures {
+interface NodeFailures{
   // randomly cause failures on nodes
   Unit run(Rat prob, List<Node> nList, Int times, Rat interval);
 }
@@ -403,7 +404,7 @@ class NodeFailuresObj() implements NodeFailures {
       //get nodes to call a change status method on each of them
       //List<NodeState> list = await m!getNodes();
 
-      foreach (n in sList){
+      foreach (n in nList){
         coin = random(100); // [0-99]
         //println("TOSSING COIN " + toString(coin) + " ---------");
         if (coin <= (prob*100)) {
@@ -415,5 +416,6 @@ class NodeFailuresObj() implements NodeFailures {
       println("");
       ctr = ctr - 1;
       await duration(interval,interval);
+    }
   }
 }

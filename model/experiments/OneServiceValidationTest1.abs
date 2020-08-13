@@ -73,7 +73,7 @@ class ClientObjectHigh(ServiceEndpoint se, Request t) implements Client {
   printer!printStatus(master,sList,350,1);
 
   List<Node> nList = await master!getNodes();
-  NodeFailures nf = new NodeFailures(1/200, nList, 350, 1);
+  NodeFailures nf = new NodeFailuresObj(1/200, nList, 350, 1);
 
   await duration(5,5);
 
