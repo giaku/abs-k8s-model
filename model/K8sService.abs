@@ -474,7 +474,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       batchSize = batchSize - 1;
     }
 
-    foreach (p in keys(scheduled)) {
+    foreach (p in elements(keys(scheduled))) {
       // create sortedRequest multipling costs per ratio
       Int nOfReq = lookupDefault(scheduled, p, 0);
       Rat reqRatio = nOfReq / batchSize(request);
@@ -484,7 +484,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
       //call processRequest and insert the result in the list of future bool
       Fut<Bool> succ = p!processRequest(sortedRequest, now(), deadline);
-      successList = insert(successList,succ);
+      successList = appendright(successList,succ);
     }
 
     Int nOfCalls = length(successList);
@@ -555,6 +555,7 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
 
 class WeightedLeastReqLbPolicy() implements ServiceLoadBalancerPolicy {
   Pod getPod(ServiceLoadBalancer lb){
+    Pod p;
     List<Pod> activePods = lb.getActivePods();
     // randomly choose first pod
     Int nPods = length(activePods);
@@ -564,17 +565,19 @@ class WeightedLeastReqLbPolicy() implements ServiceLoadBalancerPolicy {
     // randomly choose second pod
     List<Pod> remainingPods = without(activePods,p1);
 
-    Int nPods = nPods - 1;
-    Int chosen = random(nPods);
+    nPods = nPods - 1;
+    chosen = random(nPods);
     Pod p2 = nth(remainingPods,chosen);
 
     Int reqP1 = await p1!getActiveRequests();
     Int reqP2 = await p2!getActiveRequests();
 
     if (reqP1 < reqP2){
-      return p1;
+      p = p1;
     } else {
-      return p2;
+      p = p2;
     }
+
+    return p;
   }
 }
