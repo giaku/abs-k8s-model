@@ -94,10 +94,9 @@ interface Node{
   Bool refreshed = False;
   Bool memoryLock = False;
   Bool computing = False;
-  Int status = 0;
   Rat availableCpu = 0;
   Rat availableMemory = 0;
-
+  Int status = 0; // 0->normal, 1->sick, 2->dead.
   Rat requestedCpu = 0;
 
   {
@@ -125,8 +124,17 @@ interface Node{
 
     monitor!setConsumedCpu(cpu - availableCpu);
     monitor!setConsumedMemory(memory - availableMemory);
+    monitor!setNodeStatus(this.status);
 
-    availableCpu = cpu;
+    Rat cpuMultiplier = 1;
+
+    switch (this.status) {
+      1 => cpuMultiplier = 1/2; // case sick
+      2 => cpuMultiplier = 0; // case dead
+      _ => cpuMultiplier = 1; // standard case
+    }
+
+    availableCpu = truncate(cpu*cpuMultiplier);
 
     await duration(cycle,cycle);
 

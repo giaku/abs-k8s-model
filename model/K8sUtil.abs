@@ -18,7 +18,7 @@ data PodConfig = PodConfig(Rat compUnitSize, Rat monitorCycle, Rat memoryCooldow
 data ServiceConfig = ServiceConfig(String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle, Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod);
 
 data PodState = PodState(String serviceName, Int podID, String nodeName, Rat cpuConsumption, Rat memoryConsumption, Rat consumptionRatio);
-data NodeState = NodeState(String nName, Int nOfPods, Rat cpuLoad, Rat allocatedMemory, Rat totalCpu, Rat totalMemory, Rat requestedCpu);
+data NodeState = NodeState(String nName, Int nOfPods, Rat cpuLoad, Rat allocatedMemory, Rat totalCpu, Rat totalMemory, Rat requestedCpu, Int status);
 //UTILITIES
 
 // scheduler to have the resourcesRefresh method executed as first method every new time unit,
@@ -190,7 +190,7 @@ interface NodeResourcesMonitor{
   Unit setConsumedCpu(Rat value);
   Unit setConsumedMemory(Rat value);
   Unit setRequestedCpu(Rat value);
-
+  Unit setNodeStatus(Int value);
   Unit setNode(Node n);
 
   NodeState getNodeState();
@@ -209,6 +209,7 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
   Rat memoryChange = 0;
   Node node;
   String nodeName = "";
+  Int nodeStatus = 0;
 
   //Returned values, updated every refresh
   Rat cpuDisplay = 0;
@@ -238,13 +239,17 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
     this.memoryDisplay = value;
   }
 
+  Unit setNodeStatus(Int value){
+    this.nodeStatus = value;
+  }
+
   Unit setRequestedCpu(Rat value){
     this.requestedCpu = value;
   }
 
   NodeState getNodeState(){
     List<Pod> pods = await node!getPods();
-    NodeState ns = NodeState(this.nodeName, length(pods), this.cpuDisplay, this.memoryDisplay, this.totalCpu, this.totalMemory, this.requestedCpu);
+    NodeState ns = NodeState(this.nodeName, length(pods), this.cpuDisplay, this.memoryDisplay, this.totalCpu, this.totalMemory, this.requestedCpu, this.nodeStatus);
 
     return ns;
   }
@@ -307,7 +312,8 @@ class PrinterObject() implements Printer {
       println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
               "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
               "   Requested Cpu : " + toString(requestedCpu(state)) + " / " + toString(totalCpu(state)) +
-              "   Allocated Memory : " + toString(allocatedMemory(state)) + " / " + toString(totalMemory(state))
+              "   Allocated Memory : " + toString(allocatedMemory(state)) + " / " + toString(totalMemory(state)) +
+              "   Status : " + toString(status(state))
               );
     }
     println("");
@@ -406,13 +412,13 @@ class NodeFailuresObj(Rat prob, Master master, Int times, Rat interval) implemen
       List<Node> nList = await master!getNodes();
 
       foreach (n in nList){
-        coin = random(1000000); // [0-99]
-        Int s = await n!getStatus();//0->normal, 1->sick, 2->dead.
+        Int rndRange = 1000000;
+        coin = random(rndRange); // [0,n-1]
+        Int s = await n!getStatus();// 0->normal, 1->sick, 2->dead.
         if (s != 2) {
-          if (coin <= (prob*1000000)) {
+          if (coin < (prob*rndRange)) {
             if (s == 0) {
               n!setStatus(1);
-              //go sick
               println("------------STATUS CHANGED +1 SICK -----------");
             }
             if (s == 1) {
