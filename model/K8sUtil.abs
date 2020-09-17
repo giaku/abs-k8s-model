@@ -29,8 +29,10 @@ def Process res_refresh_scheduler(List<Process> queue) =
       then head(monitors) else head(queue);
 
 def Process reset_availCpu_scheduler(List<Process> queue) =
-  let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue) in
-    when (!isEmpty(refresh))
+  let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue),
+   List<Process> activeRequests = filter((Process x) => method(x) == "getActiveRequests") (queue) in
+   when (!isEmpty(activeRequests)) then head(activeRequests)
+    else when (!isEmpty(refresh))
       then head(refresh) else head(queue);
 
 // node scheduler, last method executed is resetResources, after all cpu consumptions of the time unit.
@@ -38,6 +40,12 @@ def Process node_reset_resources_scheduler(List<Process> queue) =
   let List<Process> others = filter((Process x) => method(x) == "resetResources") (queue) in
     when (!isEmpty(others))// a < b
       then head(others) else head(queue);
+
+def Process weightedLeastReqLbPolicy_scheduler(List<Process> queue) =
+  let List<Process> others = filter((Process x) => method(x) == "refreshPods") (queue) in
+    when (!isEmpty(others))// a < b
+      then head(others) else head(queue);
+
 //extract value from a InfRat (when calling total() on a DC)
 def Rat infRatValue(InfRat x) =
   case x {
@@ -59,10 +67,12 @@ interface ResourcesMonitor{
   Rat cpuConsumption();
   Rat memoryConsumption();
   Rat cpuConsumptionRatio();
+  Int getActiveRequests();
   Rat getCpuRequest();
 
   Unit consumeCpu(Rat value);
   Unit consumedMemoryUpdate(Rat value);
+  Unit updateActiveRequests(Rat value);
 
   Unit setPod(Pod p);
   Unit shutdown();
@@ -79,12 +89,15 @@ interface ResourcesMonitor{
   //modified during the time period by running processes
   Rat cpu = 0;
   Rat memoryChange = 0;
+  Rat activeReqChange = 0;
+
   Pod pod;
   Node node = null;
 
   //Returned values, updated every refresh
   Rat cpuDisplay = 0;
   Rat memoryDisplay = 0;
+  Rat activeRequests = 0;
   // cpuConsumption / cpuPerPod given by the node.
   Rat cpuConsumptionRatio = 0;
 
@@ -120,6 +133,10 @@ interface ResourcesMonitor{
     memoryDisplay = memoryDisplay + memoryChange;
     memoryChange = 0;
 
+    //Active REQUESTS
+    this.activeRequests = this.activeRequests + this.activeReqChange;
+    this.activeReqChange = 0;
+
     //println("monitor.resourceRefresh(): before await");
     //refre
     //this.pod!setRefreshed(True);
@@ -145,18 +162,25 @@ interface ResourcesMonitor{
     return this.cpuConsumptionRatio;
   }
 
+  Int getActiveRequests(){
+    return truncate(this.activeRequests);
+  }
+
   Rat getCpuRequest(){
     return cpuRequest;
   }
 
   Unit consumeCpu(Rat value){
-
     this.cpu = this.cpu + value;
   }
 
   Unit consumedMemoryUpdate(Rat mValue){
     //println("updating memChange , old val: " + toString(memoryChange) + " new val: "+ toString(this.memoryChange + mValue));
     this.memoryChange = this.memoryChange + mValue;
+  }
+
+  Unit updateActiveRequests(Rat value){
+    this.activeReqChange = this.activeReqChange + value;
   }
 
   PodState getPodState(){

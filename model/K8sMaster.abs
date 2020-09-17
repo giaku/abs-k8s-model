@@ -65,7 +65,7 @@ interface Node{
   String getName();
   NodeResourcesMonitor getMonitor();
   //Use Node cpu, equivalent to [Cost: amount] skip;
-  Bool consumeCpu(Rat amount,Pod p);
+  Rat consumeCpu(Rat amount,Pod p);
 
   Rat allocateMemory(Rat amount);
   Rat releaseMemory(Rat amount);
@@ -124,15 +124,19 @@ interface Node{
     this!resetResources();
   }
 
-  Bool consumeCpu(Rat amount,Pod p){
-    Bool result = False;
+  Rat consumeCpu(Rat amount,Pod p){
+    Bool done = False;
+    Rat timeFraction = 0;
 
     await this.availableCpu > 0;
 
-    while (!result){
+    while (!done){
       if (availableCpu >= amount){
         availableCpu = availableCpu - amount;
-        result = True;
+
+        //based on consumed cpu, example: half cpu consumed -> half time unit passed
+        timeFraction = (cpu - availableCpu) / cpu;
+        done = True;
       } else {
         println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
         amount = amount - availableCpu;
@@ -143,7 +147,7 @@ interface Node{
       }
     }
 
-    return result;
+    return timeFraction;
   }
 
   Rat allocateMemory(Rat amount){
