@@ -29,11 +29,9 @@ def Process res_refresh_scheduler(List<Process> queue) =
       then head(monitors) else head(queue);
 
 def Process reset_availCpu_scheduler(List<Process> queue) =
-  let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue),
-   List<Process> activeRequests = filter((Process x) => method(x) == "getActiveRequests") (queue) in
-   when (!isEmpty(activeRequests)) then head(activeRequests)
-    else when (!isEmpty(refresh))
-      then head(refresh) else head(queue);
+  let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue) in
+   when (!isEmpty(refresh)) then head(refresh)
+    else nth(queue,random(length(queue)));
 
 // node scheduler, last method executed is resetResources, after all cpu consumptions of the time unit.
 def Process node_reset_resources_scheduler(List<Process> queue) =
@@ -328,9 +326,9 @@ class PrinterObject() implements Printer {
 
     foreach (state in list){
       println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
-              "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
+              "   Cpu Load : " + toString(truncate(cpuLoad(state))) + " / " + toString(totalCpu(state)) +
               "   Requested Cpu : " + toString(requestedCpu(state)) + " / " + toString(totalCpu(state)) +
-              "   Allocated Memory : " + toString(allocatedMemory(state)) + " / " + toString(totalMemory(state))
+              "   Allocated Memory : " + toString(truncate(allocatedMemory(state))) + " / " + toString(totalMemory(state))
               );
     }
     println("");
@@ -342,12 +340,12 @@ class PrinterObject() implements Printer {
     Rat upscaleThreshold = await s!getUpscaleThreshold();
     List<PodState> list = await s!getPodsConsumptions();
     println("SERVICE " + serviceName + " STATUS:");
-    println("TOTAL  CPU: " + toString(cpuCsmpt(consumptions)) + "  UTIL %: " + toString(truncate(cpuRatio(consumptions) * 100)) + " / " + toString(truncate(upscaleThreshold * 100)) + "   MEMORY: " + toString(memoryCsmpt(consumptions)));
+    println("TOTAL  CPU: " + toString(truncate(cpuCsmpt(consumptions))) + "  UTIL %: " + toString(truncate(cpuRatio(consumptions) * 100)) + " / " + toString(truncate(upscaleThreshold * 100)) + "   MEMORY: " + toString(truncate(memoryCsmpt(consumptions))));
     foreach (state in list){
       println("Pod: " + toString(podID(state)) +
               "   Node : " + toString(nodeName(state)) +
-              "   Cpu Consumption: " + toString(cpuConsumption(state)) +
-              "   Allocated Memory : " + toString(memoryConsumption(state)) +
+              "   Cpu Consumption: " + toString(truncate(cpuConsumption(state))) +
+              "   Allocated Memory : " + toString(truncate(memoryConsumption(state))) +
               "   Cpu % : " + toString(truncate(consumptionRatio(state) * 100))
               );
     }

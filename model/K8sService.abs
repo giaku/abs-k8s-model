@@ -158,6 +158,8 @@ interface Pod {
 
         totalTime = totalTime + (timeValue(now()) + timeUnitFraction) * processedRequests;
 
+        //println("Pod: " + toString(this) + " Unit: " + toString(requestCost(request) - cost) + " Request: " + toString(request));
+
       } else if (cost > 0){
 
         await this.availableCpu > 0;
@@ -172,6 +174,8 @@ interface Pod {
         totalTime = totalTime + (timeValue(now()) + timeUnitFraction) * remainingRequests;
 
         cost = 0;
+
+        println("Pod: " + toString(this) +  " Request: " + toString(request) + " END");
       }
       this.executing = False;
 
@@ -272,7 +276,7 @@ class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements Ser
 
   Map<Pod,Int> distributeRequest(Request req){
     //println("LB distributeRequest STARTED");
-    Map<Pod,Int> result = await policy!distributeRequest(req);
+    Map<Pod,Int> result = policy.distributeRequest(req, activePods);
 
     return result;
   }
@@ -523,15 +527,14 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 // LOADBALANCER POLICIES
 //
 interface ServiceLoadBalancerPolicy {
-  Map<Pod,Int> distributeRequest(Request req);
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods);
   Unit setLb(ServiceLoadBalancer lb);
 }
 class RandomLbPolicy() implements ServiceLoadBalancerPolicy {
   ServiceLoadBalancer lb;
 
-  Map<Pod,Int> distributeRequest(Request req){
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
     Map<Pod,Int> result = map[];
-    List<Pod> activePods = lb.getActivePods();
     Int nPods = length(activePods);
     Int batchSize = batchSize(req);
 
@@ -560,11 +563,10 @@ class RandomLbPolicy() implements ServiceLoadBalancerPolicy {
 class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
   ServiceLoadBalancer lb;
 
-  Map<Pod,Int> distributeRequest(Request req){
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
     //println("POLICY distributeRequest STARTED");
     Map<Pod,Int> result = map[];
     println(toString(lb));
-    List<Pod> activePods = lb.getActivePods();
     Int nPods = length(activePods);
     //println("NPODS:" + toString(nPods));
     Int batchSize = batchSize(req);
@@ -603,13 +605,8 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
   ServiceLoadBalancer lb;
   Map<Pod,Int> pods = map[];
 
-  Unit run(){
-    this!refreshPods();
-  }
-
-  Map<Pod,Int> distributeRequest(Request req){
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
     Map<Pod,Int> result = map[];
-    List<Pod> activePods = lb.getActivePods();
     Int nPods = length(activePods);
     Int batchSize = batchSize(req);
     Pod p;
@@ -656,12 +653,14 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
     pods = map[];
     List<Pair<Pod,ResourcesMonitor>> lbPods = await lb!getPods();
 
+
     foreach (p in lbPods){
       ResourcesMonitor rm = snd(p);
       Fut<Int> nReq = rm!getActiveRequests();
       Int numOfReq = nReq.get;
       pods = insert(pods,Pair(fst(p),numOfReq));
     }
+
 
     await duration(cycle,cycle);
 
@@ -671,5 +670,6 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
 
   Unit setLb(ServiceLoadBalancer lb){
     this.lb = lb;
+    this!refreshPods();
   }
 }
