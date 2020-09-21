@@ -210,25 +210,11 @@ interface Node{
     monitor!setRequestedCpu(this.requestedCpu);
   }
 
-  List<ResourcesMonitor> getPMonitors(){
-    return this.pMonitors;
-  }
-
-  Rat getRequestedCpu(){
-    return this.requestedCpu;
-  }
-
-  Rat getAvailableCpu(){
-    return this.cpu - this.requestedCpu;
-  }
-
-  Int getStatus(){
-    return this.status;
-  }
-
-  Unit setStatus(Int status){
-    this.status = status;
-  }
+  List<ResourcesMonitor> getPMonitors(){ return this.pMonitors; }
+  Rat getRequestedCpu(){ return this.requestedCpu; }
+  Rat getAvailableCpu(){ return this.cpu - this.requestedCpu; }
+  Int getStatus(){ return this.status; }
+  Unit setStatus(Int status){ this.status = status; }
 }
 
 //

@@ -99,14 +99,17 @@ interface Pod {
   // wait before shut down.
   Bool isIdle();
 
+  Int getStatus();
+  Unit setStatus(Int status);
+
 }
 
 [Scheduler: reset_availCpu_scheduler(queue)] class PodObject(String serviceName, Int id, Rat compUnitSize, Rat cpuRequest, Rat cpuLimit, ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle) implements Pod {
   Bool executing = False;
   Bool blocked = False;
-
+  Int status = 0; // 0->normal, 1->sick, 2->dead.
   Node node = null;
-
+  Rat cpuStatusCoeff = 1;
   //set to failureCooldown after a resetFailureState() invocation
   Rat cooldown = 0;
 
@@ -140,18 +143,18 @@ interface Pod {
     monitor!consumedMemoryUpdate(requiredMemory);
 
     //divide cost in units to be scheduled regardless of job cost
-    while (cost > 0){
+    while (cost > 0) {
       // Lock
       await !executing;
       this.executing = True;
 
       if (cost >= compUnitSize){
         await this.availableCpu > 0;
-        await node!consumeCpu(compUnitSize,this);
+        await node!consumeCpu(compUnitSize*cpuStatusCoeff,this);
 
         await !this.blocked;
 
-        availableCpu = availableCpu - compUnitSize;
+        availableCpu = availableCpu - (compUnitSize*cpuStatusCoeff);
         monitor!consumeCpu(compUnitSize);
 
         cost = cost - compUnitSize;
@@ -169,7 +172,9 @@ interface Pod {
     }
 
     this.releaseMemory(requiredMemory);
+
     monitor!consumedMemoryUpdate(-requiredMemory);
+    monitor!setStatus(this.status);
 
     Rat spentTime = timeDifference(now(),started);
     Bool success = (spentTime <= durationValue(deadline));
@@ -229,10 +234,19 @@ interface Pod {
     return True;
   }
 
-  DC getDC(){ return thisDC();}
-  String getServiceName(){ return this.serviceName;}
+  DC getDC(){ return thisDC(); }
+  String getServiceName(){ return this.serviceName; }
   Int getID(){ return this.id; }
-  Node getNode(){return this.node; }
+  Node getNode(){ return this.node; }
+  Int getStatus(){ return this.status; }
+  Unit setStatus(Int status) {
+    this.status = status;
+    switch (this.status) {
+      1 => this.cpuStatusCoeff = 2; // case sick
+      2 => this.cpuStatusCoeff = 0; // case dead
+      _ => this.cpuStatusCoeff = 1; // standard case
+    }
+  }
 
 }
 
