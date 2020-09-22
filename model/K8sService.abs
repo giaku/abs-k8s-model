@@ -174,7 +174,7 @@ interface Pod {
     this.releaseMemory(requiredMemory);
 
     monitor!consumedMemoryUpdate(-requiredMemory);
-    monitor!setStatus(this.status);
+    monitor!setPodStatus(this.status);
 
     Rat spentTime = timeDifference(now(),started);
     Bool success = (spentTime <= durationValue(deadline));
