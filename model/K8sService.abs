@@ -23,19 +23,20 @@ interface Service{
 
   String getName();
   Rat getUpscaleThreshold();
-
-
 }
 class ServiceObject(ServiceConfig sConfig, PodConfig pConfig, ServiceLoadBalancerPolicy policy) implements Service{
   ServiceLoadBalancer lb = null;
   ServiceAutoscaler scaler = null;
   ServiceEndpoint ep = null;
 
-  Unit deploy(NodeScheduler scheduler){
+  Unit run(){
     lb = new ServiceLoadBalancerObject(policy);
     policy.setLb(lb);
-    scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
     ep = new ServiceEndpointObject(lb);
+  }
+
+  Unit deploy(NodeScheduler scheduler){
+    scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
     scaler.initialize();
   }
 
@@ -175,7 +176,7 @@ interface Pod {
 
         cost = 0;
 
-        println("Pod: " + toString(this) +  " Request: " + toString(request) + " END");
+        //println("Pod: " + toString(this) +  " Request: " + toString(request) + " END");
       }
       this.executing = False;
 
@@ -276,7 +277,7 @@ class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements Ser
 
   Map<Pod,Int> distributeRequest(Request req){
     //println("LB distributeRequest STARTED");
-    Map<Pod,Int> result = policy.distributeRequest(req, activePods);
+    Map<Pod,Int> result = await policy!distributeRequest(req, activePods);
 
     return result;
   }
@@ -465,7 +466,6 @@ interface ServiceEndpoint {
 class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
   Rat invokeService(Request request){
-    println("INVOKE SERVICE STARTED");
     Time started = now();
     Rat responseTime = 0;
 
@@ -475,20 +475,21 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
     List<Pair<Fut<Rat>,Int>> avgResponseTimes = list[];
 
     //TESTING
-    println("REQUEST BATCH SIZE: " + toString(batchSize));
+    //println("REQUEST BATCH SIZE: " + toString(batchSize));
 
+    // calls the lb to balance batch request
     scheduled = await lb!distributeRequest(request);
 
     //TESTING
-    println("BATCH SORTING TAB: ");
+    /*println("BATCH SORTING TAB: ");
     foreach (p in elements(keys(scheduled))){
       Int val = lookupDefault(scheduled, p, -1);
       println(toString(p) + ": " + toString(val));
-    }
+    }*/
 
-    println("");
-    println("SORTED REQUESTS: ");
-
+    //println("");
+    //println("SORTED REQUESTS: ");
+    //
     foreach (p in elements(keys(scheduled))) {
       // create sortedRequest multipling costs per ratio
       Int nOfReq = lookupDefault(scheduled, p, 0);
@@ -498,8 +499,8 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
 
       //TESTING
-      println(toString(p) + " - " + requestType(sortedRequest) + " - " + toString(float(requestCost)) + " - " + toString(nOfReq));
-
+      //println(toString(p) + " - " + requestType(sortedRequest) + " - " + toString(float(requestCost)) + " - " + toString(nOfReq));
+      //
       Fut<Rat> aRTime = p!processRequest(sortedRequest, now());
       Pair<Fut<Rat>,Int> avgResponseTime = Pair(aRTime,batchSize(sortedRequest));
       avgResponseTimes = appendright(avgResponseTimes,avgResponseTime);
@@ -521,6 +522,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
     return responseTime;
   }
+
 }
 
 //
@@ -566,7 +568,7 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
   Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
     //println("POLICY distributeRequest STARTED");
     Map<Pod,Int> result = map[];
-    println(toString(lb));
+    //println(toString(lb));
     Int nPods = length(activePods);
     //println("NPODS:" + toString(nPods));
     Int batchSize = batchSize(req);
@@ -575,7 +577,7 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
 
     if (nPods > 0){
       while (batchSize > 0){
-        //println("POLICY distributeRequest LOOP STARTED");
+        //println("POLICY distributeRequest LOOP STARTED  batchSize:" + toString(batchSize));
         p = head(activePods);
         activePods = tail(activePods);
         activePods = appendright(activePods,p);
@@ -593,6 +595,7 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
       lb.setActivePods(activePods);
     }
 
+    //println("POLICY distributeRequest END");
     return result;
   }
 
