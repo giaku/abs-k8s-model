@@ -121,8 +121,8 @@ interface ResourcesMonitor{
     cpuDisplay = cpu;
 
     // store in map
-    this.cpuConsumptionMap = put(cpuConsumptionMap,time,cpuDisplay);
-    this.cpuRatioMap = put(cpuRatioMap,time,cpuConsumptionRatio);
+    //this.cpuConsumptionMap = put(cpuConsumptionMap,time,cpuDisplay);
+    //this.cpuRatioMap = put(cpuRatioMap,time,cpuConsumptionRatio);
 
     // reset cpu counter
     cpu = 0;
@@ -252,7 +252,7 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
 
     //update consumption history map
     Int time = truncate(timeValue(now()));
-    this.consumptionMap = put(this.consumptionMap,time,value);
+    //this.consumptionMap = put(this.consumptionMap,time,value);
   }
 
   Unit setConsumedMemory(Rat value){

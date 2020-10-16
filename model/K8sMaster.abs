@@ -20,7 +20,7 @@ interface Master{
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory);
 }
-class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implements Master{
+class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle) implements Master{
   NodeScheduler scheduler;
 
   {
@@ -53,7 +53,7 @@ class MasterObject(CloudProvider cp, Int loadPeriod, Int resourceCycle) implemen
   }
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory){
-    await this.scheduler!createNodes(nNodes,cpu,memory);
+    await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize);
     return True;
   }
 }
@@ -78,7 +78,7 @@ interface Node{
   Rat getRequestedCpu();
   Rat getAvailableCpu();
 }
-[Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Int cycle, NodeResourcesMonitor monitor) implements Node{
+[Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle, NodeResourcesMonitor monitor) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -135,13 +135,13 @@ interface Node{
         availableCpu = availableCpu - amount;
 
         //based on consumed cpu, example: half cpu consumed -> half time unit passed
-        timeFraction = (cpu - availableCpu) / cpu;
+        timeFraction = (cpu - availableCpu) / (3 * timeUnitSize * cpu);
         done = True;
       } else {
-        println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
+        //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
         amount = amount - availableCpu;
         availableCpu = 0;
-        println("blocking pod: " + toString(p));
+        //println("blocking pod: " + toString(p));
         p!setBlocked();
         await this.availableCpu > 0;
       }
@@ -215,7 +215,7 @@ interface Node{
 //
 interface NodeScheduler{
   //create nNodes with given cpu and memory amounts.
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize);
 
   List<NodeState> getNodeStates();
   List<Node> getNodes();
@@ -234,11 +234,11 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
   // pod deploy lock
   Bool deploying = False;
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory){
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize){
     Int ctr = 0;
     while (ctr < nNodes) {
       NodeResourcesMonitor monitor = new NodeResourcesMonitorObject(resourceCycle,cpu,memory);
-      Node node = new NodeObject(nextID, cpu, memory, resourceCycle, monitor);
+      Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle, monitor);
       await monitor!setNode(node);
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
