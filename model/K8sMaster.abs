@@ -135,7 +135,7 @@ interface Node{
         availableCpu = availableCpu - amount;
 
         //based on consumed cpu, example: half cpu consumed -> half time unit passed
-        timeFraction = (cpu - availableCpu) / (3 * timeUnitSize * cpu);
+        timeFraction = (cpu - availableCpu) / (rat(1.52) * timeUnitSize * cpu);
         done = True;
       } else {
         //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));

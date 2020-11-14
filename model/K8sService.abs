@@ -284,7 +284,7 @@ class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements Ser
 
   Unit addPod(Pod p, ResourcesMonitor rm){
     pods = appendright(pods,Pair(p,rm));
-    activePods = Cons(p,activePods);
+    activePods = appendright(activePods,p);
   }
 
   Unit removePod(Pod p){
@@ -676,3 +676,90 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
     this!refreshPods();
   }
 }
+
+  [Scheduler: weightedLeastReqLbPolicy_scheduler(queue)] class IpTablesLbPolicy(Int cycle, Rat podCpuLimit) implements ServiceLoadBalancerPolicy {
+    ServiceLoadBalancer lb;
+    Map<Pod,Rat> pods = map[];
+
+    Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
+      Map<Pod,Int> result = map[];
+      Int nPods = length(activePods);
+      Int batchSize = batchSize(req);
+      Rat reqCost = requestCost(req);
+      Rat costPerRequest = reqCost / batchSize;
+      Int podIndex = 0;
+      Int round = 1;
+
+      while (batchSize > 0){
+
+        Pod p = nth(activePods,podIndex);
+        Rat pLoad = lookupDefault(pods,p,0);
+        Rat cpuToLimit = round * podCpuLimit - pLoad;
+        //println("pod:" + toString(p) + " cpuToLimit: " + toString(cpuToLimit) + " pLoad: " + toString(pLoad));
+
+        if (cpuToLimit > 0){
+          Rat toAssign = 0;
+          if (cpuToLimit < reqCost){
+            toAssign = cpuToLimit / costPerRequest;
+          } else {
+            toAssign = reqCost / costPerRequest;
+          }
+          Int reqToAssign = ceil(float(toAssign));
+
+          //add requests in the result map
+          Int currentValue = lookupDefault(result, p, -1);
+          if (currentValue != -1){
+            currentValue = currentValue + reqToAssign;
+            result = put(result, p, currentValue);
+          } else {
+            result = put(result, p, reqToAssign);
+          }
+
+          // update estimated pod load
+          Rat assignedCost = reqToAssign * costPerRequest;
+
+          pLoad = lookupDefault(pods, p, 0);
+          pods = put(pods,p,pLoad + assignedCost);
+
+          batchSize = batchSize - reqToAssign;
+          reqCost = reqCost - assignedCost;
+        }
+
+        podIndex = podIndex + 1;
+        if (podIndex >= nPods){
+          podIndex = 0;
+          round = round + 1;
+        }
+      }
+      return result;
+    }
+
+    Unit refreshPods(){
+      Fut<List<Pair<Pod,ResourcesMonitor>>> lbPodsFut = lb!getPods();
+      List<Pair<Pod,ResourcesMonitor>> lbPods = lbPodsFut.get;
+
+      foreach (p in lbPods){
+        ResourcesMonitor rm = snd(p);
+        Fut<Rat> cpuConsumptionFut = rm!cpuConsumption();
+        Rat cpuConsumption = cpuConsumptionFut.get;
+        Rat newValue = 0;
+
+        Rat mapLoad = lookupDefault(pods, fst(p), 0);
+        newValue = mapLoad - cpuConsumption;
+        if (newValue < 0){
+          newValue = 0;
+        }
+
+        pods = put(pods, fst(p), newValue);
+      }
+
+      await duration(cycle,cycle);
+
+      this.refreshPods();
+    }
+
+    Unit setLb(ServiceLoadBalancer lb){
+      this.lb = lb;
+      this!refreshPods();
+    }
+  }

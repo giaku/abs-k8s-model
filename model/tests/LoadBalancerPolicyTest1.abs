@@ -51,14 +51,14 @@ class ClientObjectHigh(ServiceEndpoint se, Request t) implements Client {
 
 {
   CloudProvider cp = new CloudProvider("Cloud");
-  Master master = new MasterObject(cp,1,1);
+  Master master = new MasterObject(cp,1,1,1);
   Bool fb = master.createNodes(1,3800,4000); // 0 - 10
   fb = master.createNodes(1,3795,4000); // 1 - 9
   fb = master.createNodes(1,3700,4000); // 2 - 11
 
   ServiceConfig sConfig1 = ServiceConfig("service_one", 3, 1, 8, 1, 80/100, 5/100, 10);
-  PodConfig pConfig1 = PodConfig(1, 1, 0, 1000, 2500);
-  ServiceLoadBalancerPolicy policy = new WeightedLeastReqLbPolicy(1);
+  PodConfig pConfig1 = PodConfig(1, 1, 0, 100, 200);
+  ServiceLoadBalancerPolicy policy = new IpTablesLbPolicy(1,cpuLimit(pConfig1));
 
   Service service1 = new ServiceObject(sConfig1, pConfig1, policy);
 
@@ -66,12 +66,12 @@ class ClientObjectHigh(ServiceEndpoint se, Request t) implements Client {
 
   ServiceEndpoint service1EP = await service1!getServiceEndpoint();
 
-  Request task1 = Request("task_one", 3750, 1, 100);
+  Request task1 = Request("task_one", 300, 1, 100);
 
   Printer printer = new PrinterObject();
   List<Service> sList = list[service1];
 
-  printer!printStatus(master,sList,10,1);
+  printer!printStatus(master,sList,18,1);
 
   await duration(5,5);
 
@@ -118,18 +118,37 @@ class ClientObjectHigh(ServiceEndpoint se, Request t) implements Client {
     ctr = ctr - 1;
   }*/
   Fut<Rat> rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
   Fut<Rat> rTime2 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  rTime1 = service1EP!invokeService(task1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+  await duration(1,1);
+  rTime1 = service1EP!invokeService(task1);
+
 
   //await duration(5,5);
   //Fut<Rat> rTime3 = service1EP!invokeService(task1);
 
-  Rat t1 = rTime1.get;
-  Float ft1 = float(t1);
-  println("r1: " + toString(ft1));
+  //Rat t1 = rTime1.get;
+  //Float ft1 = float(t1);
+  //println("r1: " + toString(ft1));
 
-  Rat t2 = rTime2.get;
-  Float ft2 = float(t2);
-  println("r2: " +toString(ft2));
+  //Rat t2 = rTime2.get;
+  //Float ft2 = float(t2);
+  //println("r2: " +toString(ft2));
 
   //Rat t3 = rTime3.get;
   //Float ft3 = float(t3);
