@@ -1,0 +1,406 @@
+/* 
+Example: Web shop with database, and very simple scaling, 
+monitoring,  load balancing and autoscaler
+
+
+Written by: Einar Broch Johnsen and S. Lizeth Tapia Tarifa
+*/
+
+module ScalableWebShop; 
+import * from ABS.DC;
+
+
+//************** For the accounting of the usage of resources**********************
+type MachineUseLog =  Map<DeploymentComponent,Pair<Time,Maybe<Time>>>;
+
+
+def Rat calcCost( MachineUseLog ml, Int res, Int interval, Time now) =
+if emptyMap(ml) then 0 else
+let (DeploymentComponent id) = take(keys(ml)) in
+let (Maybe<Pair<Time,Maybe<Time>>> p) = lookup(ml,id) in
+case p{
+  Nothing => 0 ;
+  Just(Pair(s,e)) => (costMachine(s,e,now)/interval)*res + calcCost(removeKey(ml,id), res, interval,now);
+  };
+
+def Rat costMachine(Time start ,Maybe<Time> end ,Time now) =
+case end {
+  Nothing => timeDifference(start, now);
+  Just(e) => timeDifference(start, e);
+};
+
+
+
+ // *************************************************************************************
+
+  
+
+// The clients
+interface Client {
+    }
+
+// Client with synchronous calls (i.e., does not flood the system)
+class ClosedClient (SE ep, Int cycle, Rat cost, Int nbrOfJobs, Counter c) implements Client {
+  Int jobcount = 0;
+  Unit run() {
+    await duration(cycle, cycle);
+    Bool result =  await ep!invokeService(cost);
+    if (result == True) {await c!addSuccesses(1);} else {await c!addFails(1);}
+    jobcount = jobcount + 1;
+    if (jobcount < nbrOfJobs) { this!run(); }
+  }
+}
+
+// Client with asynchronous calls (i.e., floods the system)
+class OpenClient (SE ep, Int cycle, Rat cost, Int nbrOfJobs, Counter c) implements Client {
+  Int jobcount = 0;
+    Unit run() { 
+	Fut<Bool> fresult =  ep!invokeService(cost);
+	jobcount = jobcount + 1;
+	await duration(cycle, cycle);
+	if (jobcount < nbrOfJobs) { this!run(); }
+	await fresult?; 
+	Bool result = fresult.get;
+	if (result == True)  {await c!addSuccesses(1);} else {await c!addFails(1);}
+      }
+}
+
+
+
+interface Database {
+  Bool accessData(Duration deadline);
+}
+class Database (Int transactionCost) implements Database {
+
+  Bool accessData(Duration deadline) {
+    Time start = now();
+    Int cost = transactionCost;
+    while (cost>0) {
+    [Cost: 1 ] cost = cost -1; suspend;}
+    Rat remainingTime = timeDifference(start,now());
+    return (durationValue(deadline) - remainingTime) > 0;
+  }
+}
+
+
+interface Worker {
+    Bool process(Rat taskCost,  Time started, Duration deadline);
+    DC getDC();
+}
+class WorkerObject(Database db) implements Worker {
+  
+  Bool process(Rat taskCost, Time started, Duration deadline) {
+    [Cost: taskCost] skip;                                  
+    Rat spentTime = timeDifference(now(),started);
+    Duration remainingTime = subtractFromDuration(deadline, timeDifference(started,now()));
+    Bool success = await db!accessData(remainingTime);  
+    return success;
+  }
+  
+  DC getDC(){ return thisDC();}
+}
+
+/*
+Class to specify LoadBalancer
+The LoadBalancer will decide which worker gets the next job
+*/
+interface LoadBalancer {
+  Worker getWorker();
+  Unit releaseWorker(Worker w);
+  Unit addWorker(Worker w);
+  Worker firingWorker();
+  Int getNbrAvailableW();
+  Int getNbrInuseW();
+}
+
+class RoundRobinLoadBalancer()
+implements LoadBalancer {
+  List<Worker> available = Nil;
+  List<Worker> inuse = Nil;
+
+    Unit run(){
+      await duration(1, 1);
+      Int naval = await this!getNbrAvailableW();
+      println("[Time: "+toString(timeValue(now()))+"] Available workers:"+toString(naval));
+      Int ninuse = await this!getNbrInuseW();
+      println("[Time: "+toString(timeValue(now()))+"] In use workers:"+toString(ninuse));
+      println("[Time: "+toString(timeValue(now()))+"] NUMBER OF WORKERS IS "+toString(naval+ninuse));
+      println("***********************************************************************************");
+      this!run();
+    }
+
+  
+    Worker getWorker(){
+	await (available != Nil);
+	Worker w = head(available);
+	available = tail(available);
+	inuse = appendright(inuse,w); 
+	return w;
+      }
+
+    Unit releaseWorker(Worker w){
+	available = appendright(available,w);
+	inuse = without(inuse,w); 
+      }
+
+    Unit addWorker(Worker w){
+	available = appendright(available,w);
+      }
+
+    Worker firingWorker(){
+       await (available != Nil);
+       Worker w = head(reverse(available));
+       available =  without(available,w);
+       return w;
+     }
+
+     Int getNbrAvailableW() {
+       Int a =length(available);
+       return a;}
+     
+    Int getNbrInuseW() {
+      Int i = length(inuse);
+      return i;
+    }
+      
+
+}
+
+interface Autoscaler {}
+
+
+class Autoscaler(CloudProvider cloud, LoadBalancer lb, Int nbrOfWorkers, Int nResources,Database db, Int cycle, Counter c)
+implements Autoscaler {
+
+  Unit run(){
+      Int ctr = 0;
+      while (ctr<nbrOfWorkers) {
+	Fut<DC> fs =  cloud!launchInstance(map[Pair(Speed, nResources)]);
+	DC vm = fs.get;
+	[DC: vm] Worker w = new WorkerObject(db);
+        lb!addWorker(w);
+	Time startTime = await vm!getCreationTime();
+	await c!addMachine(vm,startTime);
+	ctr=ctr+1;
+      }
+      println("[Time: "+toString(timeValue(now()))+"] ***********INIT: CUREATED "+toString(nbrOfWorkers)+" WORKERS");
+      this!resize();
+    }
+
+    
+    Unit resize(){
+      Int ctr = 0;
+      await duration(cycle, cycle);
+      Int available = await lb!getNbrAvailableW();
+      Int inuse = await lb!getNbrInuseW();
+      
+      if (available < ((available+inuse)/4))
+      {
+	ctr = 0;
+	Rat extraworkers= 2*inuse;
+        while (ctr<extraworkers) {
+	  Fut<DC> fs =  cloud!launchInstance(map[Pair(Speed, nResources)]);
+	  DC vm = fs.get;
+	  [DC: vm] Worker w = new WorkerObject(db);
+	  await lb!addWorker(w);
+	  Time startTime = await vm!getCreationTime();
+ 	  await c!addMachine(vm,startTime);
+	  ctr=ctr+1;
+	}
+      }
+
+      if ((inuse/3 < available) && (available > nbrOfWorkers))
+      {
+	ctr = 0;
+	Rat removeworkers= available/2;
+        while (ctr<removeworkers) {
+	  Worker w = await lb!firingWorker();
+	  DC dc = await w!getDC();
+          Bool down = await cloud!shutdownInstance(dc);
+	  await  c!addShutdown(dc, now());
+	  ctr=ctr+1;
+	}
+      }
+      this!resize();     
+    }
+ }
+
+
+// Class to specify Application API
+interface SE { 
+    Bool invokeService(Rat cost);
+}
+class ServiceEndpoint(LoadBalancer lb, Duration responseTime) implements SE {
+
+  Bool invokeService(Rat cost){
+      Time started = now();
+      Worker w = this.startWorker();
+      Bool success = await w!process(cost,started,responseTime);
+      await lb!releaseWorker(w);
+      return success;
+    }
+
+    // Private methods:
+    Worker startWorker() {
+	Worker w = await lb!getWorker();
+	return w;
+    }
+  }
+
+
+    //**************** This is an object for accounting things in the model****************
+
+  interface Counter {
+  Unit addSuccesses(Int amount);
+  Unit addFails(Int amount);
+  Unit addMachine(DeploymentComponent id, Time startup);
+  Unit addShutdown(DeploymentComponent id, Time shutdown);
+  Unit printSuccess();
+  Unit printFail();
+
+  Rat calculateCost(Int res, Int interval,Time until);
+  Unit printMachineUseLog();
+
+}
+
+class Counter() implements Counter {
+  Int success = 0;
+  Int fail = 0;
+  Int cost = 0;
+
+  MachineUseLog machines = map[];
+  
+  Unit addSuccesses(Int amount) {success = success+amount;}
+
+  Unit addFails(Int amount){fail = fail+amount;}
+
+  Unit printSuccess(){println("[Time: "+toString(timeValue(now()))+"] ***********************************Total successes:"+ toString(success));}
+  Unit printFail(){println("[Time: "+toString(timeValue(now()))+"] **************************************Total Fails:"+ toString(fail));}
+
+  Unit addMachine(DeploymentComponent id, Time startup){
+    machines =  insert(machines, Pair(id,Pair(startup,Nothing)));
+  }
+  Unit addShutdown(DeploymentComponent id, Time shutdown){
+    Pair<Time,Maybe<Time>> tmp = lookupDefault(machines, id,Pair(Time(-1),Nothing));
+    
+    machines = insert(removeKey(machines, id),Pair(id, Pair(fst(tmp),Just(shutdown))));
+  }
+
+  Rat calculateCost(Int res, Int interval,Time until){
+    return calcCost(machines, res, interval, until);}
+
+  Unit printMachineUseLog(){
+    Set<DeploymentComponent> machineIDs =  keys(machines);
+    while (!emptySet(machineIDs)) {	
+      DeploymentComponent dc = take(machineIDs);
+      String name = await dc!getName();
+      Pair<Time,Maybe<Time>> dctime = lookupDefault(machines,dc,Pair(Time(-1),Nothing));
+      Time frmt = fst(dctime);
+      Maybe<Time> tot = snd(dctime);
+      if  (tot != Nothing){
+	println("[Time: "+toString(timeValue(now()))+"]"+name+"->("+toString(timeValue(frmt))+","+toString(timeValue(fromJust(tot)))+")");
+      }else{
+	println("[Time: "+toString(timeValue(now()))+"]"+name+"->("+toString(timeValue(frmt))+",-)");
+      }
+      machineIDs = remove(machineIDs,dc);	
+    }
+  }
+
+}
+ //****************************************************
+
+{ // Main block
+
+  CloudProvider cloud = new CloudProvider("cloud");
+  println("[Time: "+toString(timeValue(now()))+"] Created the CloudProvider");
+
+  // number of resources:
+   Int nResources = 50;
+   Int interval = 5;
+   Int cost = 50;
+   Int nWorkers=5;
+   Duration respTime = Duration(10);
+    // number of clients:
+    Int nCloseClients = 30;
+    Int nOpenClients = 80;
+    // avg task cost:
+    Rat taskCost = 81; 
+    // number of jobs
+    Int nbrOfJobs = 10;
+
+        Counter c = new Counter(); 
+
+
+    Database db = new Database(2);
+    LoadBalancer lb = new RoundRobinLoadBalancer();
+    Autoscaler autoscaler = new Autoscaler(cloud,lb,nWorkers,nResources,db,interval,c);
+    SE endpoint = new ServiceEndpoint(lb, respTime);
+
+    await duration(50,50);
+
+    
+
+    // Start up the close clients
+    Int nClients = nCloseClients;
+    while (nClients > 0) {
+	// closed client scenario:
+         new ClosedClient(endpoint, 5,taskCost, nbrOfJobs,c);
+        nClients = nClients - 1;
+    }
+   println("[Time: "+toString(timeValue(now()))+"] *********CREATED " +toString(nCloseClients)+" CLOSE CLIENTS  WITH "  +toString(nbrOfJobs)+ " JOBS EACH");
+   
+
+    await duration(50,50);
+
+    // Start up the open clients
+    nClients = nOpenClients;
+    while (nClients > 0) {
+       // open client scenario:
+        new OpenClient(endpoint, 1, taskCost, nbrOfJobs,c);
+        nClients = nClients - 1;
+    }
+    println("[Time: "+toString(timeValue(now()))+"] ********CREATED " +toString(nOpenClients)+" OPEN CLIENTS  WITH "  +toString(nbrOfJobs)+ " JOBS EACH");
+
+    await duration(50,50);
+    
+    // Start up the close clients
+    nClients = nCloseClients;
+    while (nClients > 0) {
+	// closed client scenario:
+         new ClosedClient(endpoint, 5,taskCost, nbrOfJobs,c);
+        nClients = nClients - 1;
+    }
+  println("[Time: "+toString(timeValue(now()))+"] **********CREATED " +toString(nCloseClients)+" CLOSE CLIENTS  WITH "  +toString(nbrOfJobs)+ " JOBS EACH");
+
+    await duration(50,50);
+
+    // Start up the open clients
+    nClients = nOpenClients;
+    while (nClients > 0) {
+       // open client scenario:
+        new OpenClient(endpoint, 1, taskCost, nbrOfJobs,c);
+        nClients = nClients - 1;
+    }
+    println("[Time: "+toString(timeValue(now()))+"] CREATED " +toString(nOpenClients)+"  OPEN CLIENTS  WITH "  +toString(nbrOfJobs)+ " JOBS EACH");
+
+    await duration(100,100);
+    await c!printSuccess();
+    await c!printFail();
+
+
+
+      Rat totalCost = await c!calculateCost(cost,interval,now());
+    println("[Time: "+toString(timeValue(now()))+"] **************************************Total Cost on the cloud (until time " +toString(timeValue(now()))+ "):"+ toString(totalCost));
+
+   //  c!printMachineUseLog();
+    
+  }
+
+
+// Local Variables:
+// abs-indent: 2
+// abs-target-language: erlang
+// abs-clock-limit: 310
+// End:
+
+  

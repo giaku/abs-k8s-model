@@ -1,0 +1,242 @@
+/* Example: ABS model of the New Years Eve case study
+   Written by: Einar Broch Johnsen, Rudi Schlatte, S. Lizeth Tapia Tarifa 
+----
+   See paper:
+   Einar Broch Johnsen, Olaf Owe, Rudolf Schlatte, and S. Lizeth Tapia Tarifa
+   Dynamic Resource Reallocation Between Deployment Components
+   Proc. Intl. Conf. on Formal Engineering Methods (ICFEM 2010). LNCS 6447. Springer 2010. 
+*/ 
+
+module Example; 
+import * from ABS.DC;
+
+def Int moving_ratio() = 2;
+def Int tel_rsc() = 100; // more than 30
+def Int sms_rsc() = 142;  // more than 30
+def Int overload() = 94; // between 0 - 100
+def Int underload() = 54; // between 0 - 100
+def Int with_balancers() = 1; // between 0 - 100
+
+interface Balancer  {
+  Unit requestdc(DC comp);
+  Unit setPartner(Balancer p);
+}
+
+interface TelephoneServer  {
+  Unit call(Int calltime);
+
+  Int getcallcount();
+  Int getcallsuccess();
+  Int getcallfail();
+}
+
+interface SMSServer {
+  Unit sendSMS();
+
+  Int getsmscount();
+  Int getsmssuccess();
+  Int getsmsfail() ;
+}
+
+class TelephoneServer implements TelephoneServer  {
+  Int callcount = 0;
+  Int callsuccess = 0;
+  Int callfail = 0;
+  
+  Unit call(Int calltime){
+    Bool result = durationValue(deadline()) > 0;
+    while (calltime > 0) {
+//      println("[Time: "+toString(timeValue(now()))+"] Tel server received call");
+      [Cost: 5] calltime = calltime - 1;
+      await duration(1, 1);
+    }
+    callcount = callcount + 1;
+    if (result) 
+      callsuccess = callsuccess+1;
+    else 
+	callfail = callfail +1;
+  }
+
+  Int getcallcount() {return callcount;}
+  Int getcallsuccess() {return callsuccess;}
+  Int getcallfail() {return callfail;}
+
+}
+
+class SMSServer implements SMSServer  {
+  Int smscount = 0;
+  Int smssuccess = 0;
+  Int smsfail = 0;
+  Unit sendSMS() {
+    //    println("[Time: "+toString(timeValue(now()))+"] SMS server received sms");
+    [Cost: 1] smscount = smscount + 1;
+    Bool result = durationValue(deadline()) > 0;
+    if (result) 
+      smssuccess = smssuccess+1;
+    else 
+	smsfail = smsfail +1;
+   // Bool result = True;
+  }
+
+  Int getsmscount() {return smscount;}
+  Int getsmssuccess() {return smssuccess;}
+  Int getsmsfail() {return smsfail;}
+}
+
+
+class Handset (Int cyclelength, TelephoneServer ts, SMSServer smss) {
+  Bool call = False;
+
+  Unit normalBehavior() {
+    if (timeValue(now()) > 50 && timeValue(now()) < 70) {
+    //  println("[Time: "+toString(timeValue(now()))+"] starting midnight window");
+      this!midnightWindow();
+    } else  {	
+      if (call) {
+      [Deadline:  Duration(5)]  await ts!call(1);
+      } else {
+      [Deadline:  Duration(5)]  smss!sendSMS();
+      }
+      call = !call;
+      await duration(cyclelength,cyclelength);
+      this!normalBehavior();
+    }
+  }
+
+  Unit midnightWindow() {
+    //println("[Time: "+toString(timeValue(now()))+"] starting midnight window");
+    if (timeValue(now()) >= 70) {
+      //println("[Time: "+toString(timeValue(now()))+"] ending midnight window");
+    //  println("[Time: "+toString(timeValue(now()))+"] comeback to normal behaviour");
+      this!normalBehavior();
+    } else {
+      Int i = 0;
+      while (i < 10) {
+      [Deadline:  Duration(5)]  smss!sendSMS();
+        i = i + 1;
+      }
+      await duration(1,1);
+      this!midnightWindow();
+    }
+  }
+
+  Unit run(){
+    this!normalBehavior();
+  //  println("[Time: "+toString(timeValue(now()))+"] Running handset");
+  }
+}
+
+class Balancer(String name) implements Balancer {
+  Balancer partner = null;
+
+  Unit run() {
+    await partner != null;
+    while (True) {
+     // println("[Time: "+toString(timeValue(now()))+"] Running balancer "+name);
+      await duration(1, 1);
+      //  println("[Time: "+toString(timeValue(now()))+"] Balancer " + name + " advanced time");
+      InfRat total = await thisDC()!total(Speed);
+      Rat ld = await thisDC()!load(Speed, 1); // This does not seem to happen in Erlang
+   //   println("[Time: "+toString(timeValue(now()))+"] "+name+" load: "+toString(ld));
+    //  println("[Time: "+toString(timeValue(now()))+"] "+name+" total: "+toString(total));
+      if (ld > overload()) {
+        await partner!requestdc(thisDC());
+      }
+    }
+  }
+
+  Unit requestdc(DC comp) {
+    InfRat total = await thisDC()!total(Speed);
+//    println("request:[Time: "+toString(timeValue(now()))+"] "+name+" total: "+toString(total));
+    Rat ld = await thisDC()!load(Speed, 1);
+//    println("request[Time: "+toString(timeValue(now()))+"] "+name+" load: "+toString(ld));
+    if (ld < underload() && finvalue(total)>20) {
+      // we know total will not be InfRat
+      thisDC()!transfer(comp, finvalue(total) / moving_ratio(), Speed);
+    }
+  }
+
+  Unit setPartner(Balancer p) {
+ //   println("[Time: "+toString(timeValue(now()))+"] "+name+" received partner");
+    partner = p;
+  }
+}
+
+{ // Main block:
+  DC smscomp = new DeploymentComponent("smscomp", map[Pair(Speed, sms_rsc())]);
+  DC telcomp = new DeploymentComponent("telcomp", map[Pair(Speed, tel_rsc())]);
+ // println("starting servers");
+  [DC: smscomp] SMSServer sms = new SMSServer();
+  [DC: telcomp] TelephoneServer tel = new TelephoneServer();
+  if (with_balancers()==1){
+    //  println("starting balansers");
+    [DC: smscomp] Balancer smsb = new Balancer("smsb");
+    [DC: telcomp] Balancer telb = new Balancer("telb");
+    await smsb!setPartner(telb);
+    await telb!setPartner(smsb);
+  }
+//  println("starting handsets");
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms); 
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms); 
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  await duration(1,1);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms); 
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms); 
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+  new Handset(1,tel,sms);
+
+
+  await duration(299, 299);
+  //println("Summarizing the simulation");
+  Int callsuccess = await tel!getcallsuccess();
+  Int callfail = await tel!getcallfail();
+  Int smssuccess = await sms!getsmssuccess();
+  Int smsfail = await sms!getsmsfail();
+  Int total = callsuccess+smssuccess+callfail+smsfail;
+  Int success = callsuccess+smssuccess;
+
+  println("req," + toString(total));
+  println("succ,"+ toString(success));
+	println("tel_rsc," + toString(tel_rsc()));
+	println("sms_rsc," + toString(sms_rsc()));
+	
+
+
+
+
+  //  println("[Time: "+toString(timeValue(now()))+"] Total fails: "+ toString(callfail+smsfail));
+  //  println("[Time: "+toString(timeValue(now()))+"] Success rate "+ toString(100*success/total));
+  // Here the SLA is successrate = 100*success/total >= 85 
+
+}    
+
+
+// Local Variables:
+// abs-use-timed-interpreter: t
+// abs-indent: 2
+// abs-target-language: maude
+// abs-clock-limit: 100
+// End:

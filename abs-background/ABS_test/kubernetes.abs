@@ -1,0 +1,50 @@
+
+/* 
+ *   This file contains the draft model of Kubernetes.
+ */
+
+
+module Kubernetes;
+import * from ABS.DC;
+
+interface Database {
+    Bool accessData();
+}
+
+class DatabaseImplementation() implements Database {
+    // Making it simple for now...
+    
+    Bool accessData(){
+	return durationLessThan(deadline(), Duration(0));
+    }
+}
+
+interface Worker {
+  Bool process(Rat taskCost);
+  DC getDC();
+}
+
+class WorkerObject(Database db) implements Worker {
+
+  Bool process(Rat taskCost) {
+    [Cost: taskCost] skip;
+    // If we let the task wait for more than the dealine,
+    // it will return False in the end...
+    await duration(durationValue(deadline()), durationValue(deadline()));
+    [Deadline: deadline()] Bool success = await db!accessData();
+    return success;
+  }
+
+  DC getDC(){ return thisDC();}
+}
+{ // Main block comes here...
+
+    Database db = new DatabaseImplementation();
+
+    Worker w = new WorkerObject(db);
+
+    [Deadline: Duration(10)] Bool success =  await w!process(50);
+
+    println(toString(success));
+    
+}
