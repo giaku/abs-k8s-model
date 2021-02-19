@@ -10,7 +10,7 @@ import * from K8sMaster;
 type RequestType = String;
 type ConsumptionMap = Map<Int,Rat>;
 
-data Request = Request(RequestType requestType, Rat requestCost, Rat memory);
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize);
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
@@ -30,14 +30,20 @@ def Process res_refresh_scheduler(List<Process> queue) =
 
 def Process reset_availCpu_scheduler(List<Process> queue) =
   let List<Process> refresh = filter((Process x) => method(x) == "refreshAvailableCpu") (queue) in
-    when (!isEmpty(refresh))
-      then head(refresh) else head(queue);
+   when (!isEmpty(refresh)) then head(refresh)
+    else nth(queue,random(length(queue)));
 
 // node scheduler, last method executed is resetResources, after all cpu consumptions of the time unit.
 def Process node_reset_resources_scheduler(List<Process> queue) =
   let List<Process> others = filter((Process x) => method(x) == "resetResources") (queue) in
     when (!isEmpty(others))// a < b
       then head(others) else head(queue);
+
+def Process weightedLeastReqLbPolicy_scheduler(List<Process> queue) =
+  let List<Process> others = filter((Process x) => method(x) == "refreshPods") (queue) in
+    when (!isEmpty(others))// a < b
+      then head(others) else head(queue);
+
 //extract value from a InfRat (when calling total() on a DC)
 def Rat infRatValue(InfRat x) =
   case x {
@@ -59,10 +65,12 @@ interface ResourcesMonitor{
   Rat cpuConsumption();
   Rat memoryConsumption();
   Rat cpuConsumptionRatio();
+  Int getActiveRequests();
   Rat getCpuRequest();
 
   Unit consumeCpu(Rat value);
   Unit consumedMemoryUpdate(Rat value);
+  Unit updateActiveRequests(Rat value);
 
   Unit setPod(Pod p);
   Unit shutdown();
@@ -79,12 +87,15 @@ interface ResourcesMonitor{
   //modified during the time period by running processes
   Rat cpu = 0;
   Rat memoryChange = 0;
+  Rat activeReqChange = 0;
+
   Pod pod;
   Node node = null;
 
   //Returned values, updated every refresh
   Rat cpuDisplay = 0;
   Rat memoryDisplay = 0;
+  Rat activeRequests = 0;
   // cpuConsumption / cpuPerPod given by the node.
   Rat cpuConsumptionRatio = 0;
 
@@ -110,8 +121,8 @@ interface ResourcesMonitor{
     cpuDisplay = cpu;
 
     // store in map
-    this.cpuConsumptionMap = put(cpuConsumptionMap,time,cpuDisplay);
-    this.cpuRatioMap = put(cpuRatioMap,time,cpuConsumptionRatio);
+    //this.cpuConsumptionMap = put(cpuConsumptionMap,time,cpuDisplay);
+    //this.cpuRatioMap = put(cpuRatioMap,time,cpuConsumptionRatio);
 
     // reset cpu counter
     cpu = 0;
@@ -119,6 +130,10 @@ interface ResourcesMonitor{
     //println("updating memoryDisplay , old val: " + toString(memoryDisplay) + " new val: "+ toString(memoryDisplay + memoryChange));
     memoryDisplay = memoryDisplay + memoryChange;
     memoryChange = 0;
+
+    //Active REQUESTS
+    this.activeRequests = this.activeRequests + this.activeReqChange;
+    this.activeReqChange = 0;
 
     //println("monitor.resourceRefresh(): before await");
     //refre
@@ -145,18 +160,25 @@ interface ResourcesMonitor{
     return this.cpuConsumptionRatio;
   }
 
+  Int getActiveRequests(){
+    return truncate(this.activeRequests);
+  }
+
   Rat getCpuRequest(){
     return cpuRequest;
   }
 
   Unit consumeCpu(Rat value){
-
     this.cpu = this.cpu + value;
   }
 
   Unit consumedMemoryUpdate(Rat mValue){
     //println("updating memChange , old val: " + toString(memoryChange) + " new val: "+ toString(this.memoryChange + mValue));
     this.memoryChange = this.memoryChange + mValue;
+  }
+
+  Unit updateActiveRequests(Rat value){
+    this.activeReqChange = this.activeReqChange + value;
   }
 
   PodState getPodState(){
@@ -230,7 +252,7 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
 
     //update consumption history map
     Int time = truncate(timeValue(now()));
-    this.consumptionMap = put(this.consumptionMap,time,value);
+    //this.consumptionMap = put(this.consumptionMap,time,value);
   }
 
   Unit setConsumedMemory(Rat value){
@@ -301,12 +323,12 @@ class PrinterObject() implements Printer {
 
   Unit printNodesStates(List<NodeState> list){
     println("MASTER STATUS:");
-    
+
     foreach (state in list){
       println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
-              "   Cpu Load : " + toString(cpuLoad(state)) + " / " + toString(totalCpu(state)) +
+              "   Cpu Load : " + toString(truncate(cpuLoad(state))) + " / " + toString(totalCpu(state)) +
               "   Requested Cpu : " + toString(requestedCpu(state)) + " / " + toString(totalCpu(state)) +
-              "   Allocated Memory : " + toString(allocatedMemory(state)) + " / " + toString(totalMemory(state))
+              "   Allocated Memory : " + toString(truncate(allocatedMemory(state))) + " / " + toString(totalMemory(state))
               );
     }
     println("");
@@ -318,12 +340,12 @@ class PrinterObject() implements Printer {
     Rat upscaleThreshold = await s!getUpscaleThreshold();
     List<PodState> list = await s!getPodsConsumptions();
     println("SERVICE " + serviceName + " STATUS:");
-    println("TOTAL  CPU: " + toString(cpuCsmpt(consumptions)) + "  UTIL %: " + toString(truncate(cpuRatio(consumptions) * 100)) + " / " + toString(truncate(upscaleThreshold * 100)) + "   MEMORY: " + toString(memoryCsmpt(consumptions)));
+    println("TOTAL  CPU: " + toString(truncate(cpuCsmpt(consumptions))) + "  UTIL %: " + toString(truncate(cpuRatio(consumptions) * 100)) + " / " + toString(truncate(upscaleThreshold * 100)) + "   MEMORY: " + toString(truncate(memoryCsmpt(consumptions))));
     foreach (state in list){
       println("Pod: " + toString(podID(state)) +
               "   Node : " + toString(nodeName(state)) +
-              "   Cpu Consumption: " + toString(cpuConsumption(state)) +
-              "   Allocated Memory : " + toString(memoryConsumption(state)) +
+              "   Cpu Consumption: " + toString(truncate(cpuConsumption(state))) +
+              "   Allocated Memory : " + toString(truncate(memoryConsumption(state))) +
               "   Cpu % : " + toString(truncate(consumptionRatio(state) * 100))
               );
     }

@@ -1,0 +1,53 @@
+module K8sWorkflow;
+
+export *;
+
+import * from K8sService;
+import * from K8sUtil;
+
+/*import * from ABS.DC;
+
+import * from K8sUtil;
+import * from ABS.Scheduler;*/
+
+interface ServiceTask{
+  Rat execute();
+}
+class ServiceRequest(ServiceEndpoint se, Request request) implements ServiceTask{
+  Rat execute(){
+    Rat rTime = await se!invokeService(request);
+
+    return rTime;
+  }
+}
+class ServiceWorkflow(List<List<ServiceTask>> tasks) implements ServiceTask{
+  Rat execute(){
+    Rat rTime = 0;
+
+    foreach (tList in tasks){
+      Rat rt = this.executeParallel(tList);
+      rTime = rTime + rt;
+    }
+
+    return rTime;
+  }
+  Rat executeParallel(List<ServiceTask> list){
+    Rat rTime = 0;
+    List<Fut<Rat>> timeFuts = list[];
+
+    foreach (task in list){
+      Fut<Rat> timeFut = task!execute();
+      timeFuts = appendright(timeFuts,timeFut);
+    }
+
+    foreach (tf in timeFuts){
+      await tf?;
+      Rat t = tf.get;
+      if (t > rTime){
+        rTime = t;
+      }
+    }
+
+    return rTime;
+  }
+}

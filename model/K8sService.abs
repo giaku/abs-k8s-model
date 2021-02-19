@@ -16,9 +16,6 @@ interface Service{
 
   Unit deploy(NodeScheduler scheduler);
 
-  Int getSuccesses();
-  Int getFailures();
-
   //fst = cpu , snd = memory
   ServiceState getConsumption();
 
@@ -26,35 +23,25 @@ interface Service{
 
   String getName();
   Rat getUpscaleThreshold();
-
-
 }
-class ServiceObject(ServiceConfig sConfig, PodConfig pConfig) implements Service{
+class ServiceObject(ServiceConfig sConfig, PodConfig pConfig, ServiceLoadBalancerPolicy policy) implements Service{
   ServiceLoadBalancer lb = null;
   ServiceAutoscaler scaler = null;
   ServiceEndpoint ep = null;
 
-  Unit deploy(NodeScheduler scheduler){
-    lb = new RRServiceLoadBalancer();
-    scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
+  Unit run(){
+    lb = new ServiceLoadBalancerObject(policy);
+    policy.setLb(lb);
     ep = new ServiceEndpointObject(lb);
+  }
+
+  Unit deploy(NodeScheduler scheduler){
+    scaler = new ServiceAutoscalerObject(scheduler, lb, sConfig, pConfig);
     scaler.initialize();
   }
 
   ServiceEndpoint getServiceEndpoint(){
     return this.ep;
-  }
-
-  Int getSuccesses(){
-    Fut<Int> r = ep!getSuccesses();
-    Int result = r.get;
-    return result;
-  }
-
-  Int getFailures(){
-    Fut<Int> r = ep!getFailures();
-    Int result = r.get;
-    return result;
   }
 
   ServiceState getConsumption(){
@@ -82,7 +69,7 @@ class ServiceObject(ServiceConfig sConfig, PodConfig pConfig) implements Service
 // POD
 //
 interface Pod {
-  Bool processRequest(Request request, Time started, Duration deadline);
+  Rat processRequest(Request request, Time started);
 
   Unit setBlocked();
 
@@ -95,6 +82,7 @@ interface Pod {
   Unit setNode(Node n);
   String getServiceName();
   Int getID();
+  Int getActiveRequests();
 
   // wait before shut down.
   Bool isIdle();
@@ -131,10 +119,19 @@ interface Pod {
     this!refreshAvailableCpu();
   }
 
-  Bool processRequest(Request request, Time started, Duration deadline){
+  // return the average time spent
+  Rat processRequest(Request request, Time started){
     this.activeRequests = this.activeRequests + 1;
+
+    Rat totalTime = 0;
+
+    Rat remainingRequests = batchSize(request);
+    await monitor!updateActiveRequests(remainingRequests);
+
     Rat cost = requestCost(request);
     Rat requiredMemory = memory(request);
+
+    Rat requestsPerCostUnit = batchSize(request) / requestCost(request);
 
     this.allocateMemory(requiredMemory);
     monitor!consumedMemoryUpdate(requiredMemory);
@@ -145,9 +142,9 @@ interface Pod {
       await !executing;
       this.executing = True;
 
-      if (cost >= compUnitSize){
+      if (cost > compUnitSize){
         await this.availableCpu > 0;
-        await node!consumeCpu(compUnitSize,this);
+        Rat timeUnitFraction = await node!consumeCpu(compUnitSize,this);
 
         await !this.blocked;
 
@@ -155,27 +152,45 @@ interface Pod {
         monitor!consumeCpu(compUnitSize);
 
         cost = cost - compUnitSize;
+
+        Rat processedRequests = requestsPerCostUnit * compUnitSize;
+        remainingRequests = remainingRequests - processedRequests;
+        monitor!updateActiveRequests(-processedRequests);
+
+        totalTime = totalTime + (timeValue(now()) + timeUnitFraction) * processedRequests;
+
+        //println("Pod: " + toString(this) + " Unit: " + toString(requestCost(request) - cost) + " Request: " + toString(request));
+
       } else if (cost > 0){
+
         await this.availableCpu > 0;
-        await node!consumeCpu(cost,this);
+        Rat timeUnitFraction = await node!consumeCpu(cost,this);
         await !this.blocked;
 
-        availableCpu = availableCpu - 1;
+        availableCpu = availableCpu - cost;
         monitor!consumeCpu(cost);
+
+        monitor!updateActiveRequests(-remainingRequests);
+
+        totalTime = totalTime + (timeValue(now()) + timeUnitFraction) * remainingRequests;
+
         cost = 0;
+
+        //println("Pod: " + toString(this) +  " Request: " + toString(request) + " END");
       }
       this.executing = False;
+
       suspend;
     }
 
     this.releaseMemory(requiredMemory);
     monitor!consumedMemoryUpdate(-requiredMemory);
 
-    Rat spentTime = timeDifference(now(),started);
-    Bool success = (spentTime <= durationValue(deadline));
+    Rat averageTimeSpent = timeDifference(Time(totalTime / batchSize(request)),started);
+    //Bool success = (spentTime <= durationValue(deadline));
 
     this.activeRequests = this.activeRequests - 1;
-    return success;
+    return averageTimeSpent;
   }
 
   Unit setBlocked(){
@@ -229,6 +244,7 @@ interface Pod {
     return True;
   }
 
+  Int getActiveRequests(){return this.activeRequests;}
   DC getDC(){ return thisDC();}
   String getServiceName(){ return this.serviceName;}
   Int getID(){ return this.id; }
@@ -241,43 +257,34 @@ interface Pod {
 //
 interface ServiceLoadBalancer{
 
-  Pod getPod();
+  Map<Pod,Int> distributeRequest(Request req);
   Unit addPod(Pod p, ResourcesMonitor rm);
   Unit removePod(Pod p);
   List<Pair<Pod,ResourcesMonitor>> getPods();
+  List<Pod> getActivePods();
+  Unit setActivePods(List<Pod> aPods);
   // Returns the total consumptions for the Service
   ServiceState getConsumptions();
   //Returns a List of PodStates
   List<PodState> getPodsConsumptions();
 }
 
-class RRServiceLoadBalancer implements ServiceLoadBalancer{
+class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements ServiceLoadBalancer{
   //List of all the pods
   List<Pair<Pod,ResourcesMonitor>> pods = list[];
   //List to consider for scheduling, suspended pods not included
   List<Pod> activePods = list[];
 
-  Pod getPod(){
-    Bool found = False;
-    Int count = 0;
-    Int nPods = length(activePods);
+  Map<Pod,Int> distributeRequest(Request req){
+    //println("LB distributeRequest STARTED");
+    Map<Pod,Int> result = await policy!distributeRequest(req, activePods);
 
-    Pod p = null;
-
-    while (!found && count < nPods){
-      p = head(activePods);
-      activePods = tail(activePods);
-      activePods = appendright(activePods,p);
-
-      found = True;
-    }
-
-    return p;
+    return result;
   }
 
   Unit addPod(Pod p, ResourcesMonitor rm){
     pods = appendright(pods,Pair(p,rm));
-    activePods = Cons(p,activePods);
+    activePods = appendright(activePods,p);
   }
 
   Unit removePod(Pod p){
@@ -303,6 +310,15 @@ class RRServiceLoadBalancer implements ServiceLoadBalancer{
     }
 
     return result;
+  }
+
+  List<Pod> getActivePods(){
+    //println("LB getActivePods STARTED");
+    return this.activePods;
+  }
+
+  Unit setActivePods(List<Pod> aPods){
+    this.activePods = aPods;
   }
 
   ServiceState getConsumptions(){
@@ -445,34 +461,305 @@ class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, S
 // SERVICE ENDPOINT
 //
 interface ServiceEndpoint {
-  Bool invokeService(Request request, Duration deadline);
-
-  Int getSuccesses();
-  Int getFailures();
+  Rat invokeService(Request request);
 }
 class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
-  Int successes = 0;
-  Int failures = 0;
 
-  Bool invokeService(Request request, Duration deadline){
+  Rat invokeService(Request request){
     Time started = now();
-    Pod p = await lb!getPod();
-    Bool success = await p!processRequest(request, now(), deadline);
+    Rat responseTime = 0;
 
-    if (success){
-      successes = successes + 1;
-    } else {
-      failures = failures + 1;
+    Int batchSize = batchSize(request);
+    Map<Pod,Int> scheduled = map[];
+
+    List<Pair<Fut<Rat>,Int>> avgResponseTimes = list[];
+
+    //TESTING
+    //println("REQUEST BATCH SIZE: " + toString(batchSize));
+
+    // calls the lb to balance batch request
+    scheduled = await lb!distributeRequest(request);
+
+    //TESTING
+    /*println("BATCH SORTING TAB: ");
+    foreach (p in elements(keys(scheduled))){
+      Int val = lookupDefault(scheduled, p, -1);
+      println(toString(p) + ": " + toString(val));
+    }*/
+
+    //println("");
+    //println("SORTED REQUESTS: ");
+    //
+    foreach (p in elements(keys(scheduled))) {
+      // create sortedRequest multipling costs per ratio
+      Int nOfReq = lookupDefault(scheduled, p, 0);
+      Rat reqRatio = nOfReq / batchSize(request);
+      Rat requestCost = requestCost(request) * reqRatio;
+      Rat requestMemory = memory(request) * reqRatio;
+      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
+
+      //TESTING
+      //println(toString(p) + " - " + requestType(sortedRequest) + " - " + toString(float(requestCost)) + " - " + toString(nOfReq));
+      //
+      Fut<Rat> aRTime = p!processRequest(sortedRequest, now());
+      Pair<Fut<Rat>,Int> avgResponseTime = Pair(aRTime,batchSize(sortedRequest));
+      avgResponseTimes = appendright(avgResponseTimes,avgResponseTime);
     }
 
-    return success;
+    Int nOfCalls = length(avgResponseTimes);
+
+    while (nOfCalls > 0){
+      Pair<Fut<Rat>,Int> p = head(avgResponseTimes);
+      Fut<Rat> v = fst(p);
+      await v?;
+      Rat val = v.get;
+
+      responseTime = responseTime + (val * snd(p));
+      avgResponseTimes = tail(avgResponseTimes);
+      nOfCalls = nOfCalls - 1;
+    }
+    responseTime = responseTime / batchSize;
+
+    return responseTime;
   }
 
-  Int getSuccesses(){
-    return this.successes;
+}
+
+//
+// LOADBALANCER POLICIES
+//
+interface ServiceLoadBalancerPolicy {
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods);
+  Unit setLb(ServiceLoadBalancer lb);
+}
+class RandomLbPolicy() implements ServiceLoadBalancerPolicy {
+  ServiceLoadBalancer lb;
+
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
+    Map<Pod,Int> result = map[];
+    Int nPods = length(activePods);
+    Int batchSize = batchSize(req);
+
+    while (batchSize > 0){
+      Int chosen = random(nPods);
+      Pod p = nth(activePods,chosen);
+
+      Int currentValue = lookupDefault(result, p, -1);
+
+      if (currentValue != -1){
+        currentValue = currentValue + 1;
+        result = put(result, p, currentValue);
+      } else {
+        result = insert(result, Pair(p,1));
+      }
+      batchSize = batchSize - 1;
+    }
+    return result;
   }
 
-  Int getFailures(){
-    return this.failures;
+  Unit setLb(ServiceLoadBalancer lb){
+    this.lb = lb;
   }
 }
+
+class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
+  ServiceLoadBalancer lb;
+
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
+    //println("POLICY distributeRequest STARTED");
+    Map<Pod,Int> result = map[];
+    //println(toString(lb));
+    Int nPods = length(activePods);
+    //println("NPODS:" + toString(nPods));
+    Int batchSize = batchSize(req);
+    //println("batchSize:" + toString(batchSize));
+    Pod p = null;
+
+    if (nPods > 0){
+      while (batchSize > 0){
+        //println("POLICY distributeRequest LOOP STARTED  batchSize:" + toString(batchSize));
+        p = head(activePods);
+        activePods = tail(activePods);
+        activePods = appendright(activePods,p);
+
+        Int currentValue = lookupDefault(result, p, -1);
+
+        if (currentValue != -1){
+          currentValue = currentValue + 1;
+          result = put(result, p, currentValue);
+        } else {
+          result = insert(result, Pair(p,1));
+        }
+        batchSize = batchSize - 1;
+      }
+      lb.setActivePods(activePods);
+    }
+
+    //println("POLICY distributeRequest END");
+    return result;
+  }
+
+  Unit setLb(ServiceLoadBalancer lb){
+    this.lb = lb;
+  }
+}
+
+[Scheduler: weightedLeastReqLbPolicy_scheduler(queue)] class WeightedLeastReqLbPolicy(Int cycle) implements ServiceLoadBalancerPolicy {
+  ServiceLoadBalancer lb;
+  Map<Pod,Int> pods = map[];
+
+  Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
+    Map<Pod,Int> result = map[];
+    Int nPods = length(activePods);
+    Int batchSize = batchSize(req);
+    Pod p;
+
+    while (batchSize > 0){
+      // randomly choose pods
+      Int r1 = random(nPods);
+      Int r2 = random(nPods);
+      while (r1 == r2){
+        r2 = random(nPods);
+      }
+
+      Pod p1 = nth(activePods,r1);
+      Pod p2 = nth(activePods,r2);
+
+      // take number of active requests
+      Int reqP1 = lookupDefault(pods, p1, 0);
+      Int reqP2 = lookupDefault(pods, p2, 0);
+
+      if (reqP1 < reqP2){
+        p = p1;
+        //Live update of the requests map in this time unit
+        pods = put(pods,p1,reqP1 + 1);
+      } else {
+        p = p2;
+        //Live update of the requests map in this time unit
+        pods = put(pods,p2,reqP2 + 1);
+      }
+
+      Int currentValue = lookupDefault(result, p, -1);
+
+      if (currentValue != -1){
+        currentValue = currentValue + 1;
+        result = put(result, p, currentValue);
+      } else {
+        result = insert(result, Pair(p,1));
+      }
+      batchSize = batchSize - 1;
+    }
+    return result;
+  }
+
+  Unit refreshPods(){
+    pods = map[];
+    List<Pair<Pod,ResourcesMonitor>> lbPods = await lb!getPods();
+
+
+    foreach (p in lbPods){
+      ResourcesMonitor rm = snd(p);
+      Fut<Int> nReq = rm!getActiveRequests();
+      Int numOfReq = nReq.get;
+      pods = insert(pods,Pair(fst(p),numOfReq));
+    }
+
+
+    await duration(cycle,cycle);
+
+    this.refreshPods();
+
+  }
+
+  Unit setLb(ServiceLoadBalancer lb){
+    this.lb = lb;
+    this!refreshPods();
+  }
+}
+
+  [Scheduler: weightedLeastReqLbPolicy_scheduler(queue)] class IpTablesLbPolicy(Int cycle, Rat podCpuLimit) implements ServiceLoadBalancerPolicy {
+    ServiceLoadBalancer lb;
+    Map<Pod,Rat> pods = map[];
+
+    Map<Pod,Int> distributeRequest(Request req, List<Pod> activePods){
+      Map<Pod,Int> result = map[];
+      Int nPods = length(activePods);
+      Int batchSize = batchSize(req);
+      Rat reqCost = requestCost(req);
+      Rat costPerRequest = reqCost / batchSize;
+      Int podIndex = 0;
+      Int round = 1;
+
+      while (batchSize > 0){
+
+        Pod p = nth(activePods,podIndex);
+        Rat pLoad = lookupDefault(pods,p,0);
+        Rat cpuToLimit = round * podCpuLimit - pLoad;
+        //println("pod:" + toString(p) + " cpuToLimit: " + toString(cpuToLimit) + " pLoad: " + toString(pLoad));
+
+        if (cpuToLimit > 0){
+          Rat toAssign = 0;
+          if (cpuToLimit < reqCost){
+            toAssign = cpuToLimit / costPerRequest;
+          } else {
+            toAssign = reqCost / costPerRequest;
+          }
+          Int reqToAssign = ceil(float(toAssign));
+
+          //add requests in the result map
+          Int currentValue = lookupDefault(result, p, -1);
+          if (currentValue != -1){
+            currentValue = currentValue + reqToAssign;
+            result = put(result, p, currentValue);
+          } else {
+            result = put(result, p, reqToAssign);
+          }
+
+          // update estimated pod load
+          Rat assignedCost = reqToAssign * costPerRequest;
+
+          pLoad = lookupDefault(pods, p, 0);
+          pods = put(pods,p,pLoad + assignedCost);
+
+          batchSize = batchSize - reqToAssign;
+          reqCost = reqCost - assignedCost;
+        }
+
+        podIndex = podIndex + 1;
+        if (podIndex >= nPods){
+          podIndex = 0;
+          round = round + 1;
+        }
+      }
+      return result;
+    }
+
+    Unit refreshPods(){
+      Fut<List<Pair<Pod,ResourcesMonitor>>> lbPodsFut = lb!getPods();
+      List<Pair<Pod,ResourcesMonitor>> lbPods = lbPodsFut.get;
+
+      foreach (p in lbPods){
+        ResourcesMonitor rm = snd(p);
+        Fut<Rat> cpuConsumptionFut = rm!cpuConsumption();
+        Rat cpuConsumption = cpuConsumptionFut.get;
+        Rat newValue = 0;
+
+        Rat mapLoad = lookupDefault(pods, fst(p), 0);
+        newValue = mapLoad - cpuConsumption;
+        if (newValue < 0){
+          newValue = 0;
+        }
+
+        pods = put(pods, fst(p), newValue);
+      }
+
+      await duration(cycle,cycle);
+
+      this.refreshPods();
+    }
+
+    Unit setLb(ServiceLoadBalancer lb){
+      this.lb = lb;
+      this!refreshPods();
+    }
+  }
