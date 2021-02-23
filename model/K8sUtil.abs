@@ -10,7 +10,7 @@ import * from K8sMaster;
 type RequestType = String;
 type ConsumptionMap = Map<Int,Rat>;
 
-data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize);
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize, Rat timeBaseline);
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
@@ -57,6 +57,22 @@ def Rat maybeZero(Maybe<Rat> x) =
     | _ => 0
   };
 
+// defines a function structured as different polynomes depending on value thresholds
+// for n coefficients lists => n - 1 thresholds
+data PolyFunction = PolyFunction(List<List<Float>> coeffList, List<Float> thresholds);
+
+// evaluates a function structured as different polynomes depending on value thresholds in value
+def Float polFuncEval(PolyFunction pf, Float value) =
+  when  isEmpty(thresholds(pf))
+  then  polEval(head(coeffList(pf)),value)
+  else (when value <= head(thresholds(pf))
+        then polEval(head(coeffList(pf)),value)
+        else polFuncEval(PolyFunction(without(coeffList(pf),head(coeffList(pf))),without(thresholds(pf),head(thresholds(pf)))),value))
+  ;
+
+// evaluates a polynome defined by coefficients in value
+def Float polEval(List<Float> coefficients, Float value) =
+  foldl((Float a,Float b) => b * value + a)(coefficients,0.0);
 
 //
 // POD RESOURCE MONITOR

@@ -10,26 +10,31 @@ import * from K8sUtil;
 import * from K8sUtil;
 import * from ABS.Scheduler;*/
 
+
+
 interface ServiceTask{
   Rat execute();
 }
 class ServiceRequest(ServiceEndpoint se, Request request) implements ServiceTask{
   Rat execute(){
-    Rat rTime = await se!invokeService(request);
+    Rat responseTimeDelay = await se!invokeService(request);
 
-    return rTime;
+    return responseTimeDelay;
   }
 }
-class ServiceWorkflow(List<List<ServiceTask>> tasks) implements ServiceTask{
+class ServiceWorkflow(List<List<ServiceTask>> tasks, Rat workflowBaseline, PolyFunction pf) implements ServiceTask{
   Rat execute(){
-    Rat rTime = 0;
+    Rat totalRtDelay = 0;
 
     foreach (tList in tasks){
-      Rat rt = this.executeParallel(tList);
-      rTime = rTime + rt;
+      Rat rtDelay = this.executeParallel(tList);
+      totalRtDelay = totalRtDelay + rtDelay;
     }
 
-    return rTime;
+    // compute baseline response time + delay caused response time
+    Rat responseTime = workflowBaseline + rat(polFuncEval(pf,float(totalRtDelay)));
+
+    return responseTime;
   }
   Rat executeParallel(List<ServiceTask> list){
     Rat rTime = 0;

@@ -496,7 +496,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       Rat reqRatio = nOfReq / batchSize(request);
       Rat requestCost = requestCost(request) * reqRatio;
       Rat requestMemory = memory(request) * reqRatio;
-      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
+      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq, timeBaseline(request));
 
       //TESTING
       //println(toString(p) + " - " + requestType(sortedRequest) + " - " + toString(float(requestCost)) + " - " + toString(nOfReq));

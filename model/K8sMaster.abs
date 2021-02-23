@@ -65,7 +65,7 @@ interface Node{
   String getName();
   NodeResourcesMonitor getMonitor();
   //Use Node cpu, equivalent to [Cost: amount] skip;
-  Rat consumeCpu(Rat amount,Pod p);
+  Rat consumeCpu(Rat amount,Pod p,Rat systemConsumptionRate);
 
   Rat allocateMemory(Rat amount);
   Rat releaseMemory(Rat amount);
@@ -78,7 +78,8 @@ interface Node{
   Rat getRequestedCpu();
   Rat getAvailableCpu();
 }
-[Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle, NodeResourcesMonitor monitor) implements Node{
+[Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
+                                                                    Rat baseSystemCpuLoad, NodeResourcesMonitor monitor) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -88,6 +89,7 @@ interface Node{
 
   Rat availableCpu = 0;
   Rat availableMemory = 0;
+  Rat systemCpuLoad = 0;
 
   Rat requestedCpu = 0;
 
@@ -95,6 +97,7 @@ interface Node{
     this.name = ("Node-" + toString(id));
     availableCpu = cpu;
     availableMemory = memory;
+    systemCpuLoad = baseSystemCpuLoad;
     this!resetResources();
   }
 
@@ -118,32 +121,69 @@ interface Node{
     monitor!setConsumedMemory(memory - availableMemory);
 
     availableCpu = cpu;
+    systemCpuLoad = baseSystemCpuLoad;
 
     await duration(cycle,cycle);
 
     this!resetResources();
   }
 
-  Rat consumeCpu(Rat amount,Pod p){
+  // consumes remaining system load, if there, after all pod consumptions in the time unit
+  Unit consumeSystemLoad(){
+    await duration(cycle/2,cycle/2);
+
+    availableCpu = availableCpu - systemCpuLoad;
+
+    await duration(cycle/2,cycle/2);
+
+    this!consumeSystemLoad();
+  }
+
+  // consumes an amount of the system load, called during pod consumptions
+  Unit consumeSystemCpu(Rat amount){
+    if (amount >= systemCpuLoad){
+      availableCpu = availableCpu - amount;
+      systemCpuLoad = systemCpuLoad - amount;
+    }else{
+      availableCpu = availableCpu - systemCpuLoad;
+      systemCpuLoad = 0;
+    }
+  }
+
+  Rat consumeCpu(Rat amount,Pod p,Rat systemConsumptionRate){
     Bool done = False;
     Rat timeFraction = 0;
-
-    await this.availableCpu > 0;
+    Rat generatedSysLoad = amount * systemConsumptionRate;
+    Rat servAvailCpu = 0;
 
     while (!done){
-      if (availableCpu >= amount){
+      await (availableCpu - systemCpuLoad) > 0;
+      servAvailCpu = availableCpu - (systemCpuLoad + generatedSysLoad);
+
+      if (servAvailCpu >= amount){
         availableCpu = availableCpu - amount;
+        systemCpuLoad = systemCpuLoad + generatedSysLoad;
 
         //based on consumed cpu, example: half cpu consumed -> half time unit passed
-        timeFraction = (cpu - availableCpu) / (rat(1.52) * timeUnitSize * cpu);
+        timeFraction = (cpu - availableCpu) / cpu;
+
+        // consumes the same amount of system load
+        this.consumeSystemCpu(amount);
+
         done = True;
       } else {
         //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
-        amount = amount - availableCpu;
-        availableCpu = 0;
+        amount = amount - servAvailCpu;
+        availableCpu = availableCpu - servAvailCpu;
+
+        systemCpuLoad = systemCpuLoad + generatedSysLoad;
+        generatedSysLoad = 0;
+
+        this.consumeSystemCpu(servAvailCpu);
         //println("blocking pod: " + toString(p));
         p!setBlocked();
-        await this.availableCpu > 0;
+
+        await (availableCpu - systemCpuLoad) > 0;
       }
     }
 
@@ -234,11 +274,11 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
   // pod deploy lock
   Bool deploying = False;
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize){
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption){
     Int ctr = 0;
     while (ctr < nNodes) {
       NodeResourcesMonitor monitor = new NodeResourcesMonitorObject(resourceCycle,cpu,memory);
-      Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle, monitor);
+      Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle, baseSysConsumption, monitor);
       await monitor!setNode(node);
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
