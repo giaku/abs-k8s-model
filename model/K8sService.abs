@@ -89,7 +89,8 @@ interface Pod {
 
 }
 
-[Scheduler: reset_availCpu_scheduler(queue)] class PodObject(String serviceName, Int id, Rat compUnitSize, Rat cpuRequest, Rat cpuLimit, ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle) implements Pod {
+[Scheduler: reset_availCpu_scheduler(queue)] class PodObject(String serviceName, Int id, Rat compUnitSize, Rat cpuRequest, Rat cpuLimit,
+                                                             ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle) implements Pod {
   Bool executing = False;
   Bool blocked = False;
 
@@ -144,7 +145,8 @@ interface Pod {
 
       if (cost > compUnitSize){
         await this.availableCpu > 0;
-        Rat timeUnitFraction = await node!consumeCpu(compUnitSize,this);
+        Rat timeUnitFraction = await node!consumeCpu(compUnitSize,this,cpuSysLoadPerCostUnit(request));
+        //println("timeUnitFraction: " + toString(timeUnitFraction));
 
         await !this.blocked;
 
@@ -164,7 +166,7 @@ interface Pod {
       } else if (cost > 0){
 
         await this.availableCpu > 0;
-        Rat timeUnitFraction = await node!consumeCpu(cost,this);
+        Rat timeUnitFraction = await node!consumeCpu(cost,this,cpuSysLoadPerCostUnit(request));
         await !this.blocked;
 
         availableCpu = availableCpu - cost;
@@ -187,6 +189,7 @@ interface Pod {
     monitor!consumedMemoryUpdate(-requiredMemory);
 
     Rat averageTimeSpent = timeDifference(Time(totalTime / batchSize(request)),started);
+    println("totalTimeSpent: " + toString(float(totalTime)) + "  nReq: " + toString(batchSize(request)));
     //Bool success = (spentTime <= durationValue(deadline));
 
     this.activeRequests = this.activeRequests - 1;
@@ -496,7 +499,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       Rat reqRatio = nOfReq / batchSize(request);
       Rat requestCost = requestCost(request) * reqRatio;
       Rat requestMemory = memory(request) * reqRatio;
-      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq, timeBaseline(request));
+      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq, timeBaseline(request), cpuSysLoadPerCostUnit(request));
 
       //TESTING
       //println(toString(p) + " - " + requestType(sortedRequest) + " - " + toString(float(requestCost)) + " - " + toString(nOfReq));

@@ -18,7 +18,7 @@ interface Master{
 
   List<Pair<String,ConsumptionMap>> getNodesMap();
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad);
 }
 class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle) implements Master{
   NodeScheduler scheduler;
@@ -52,8 +52,8 @@ class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resou
     return result;
   }
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory){
-    await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad){
+    await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize, baseSystemLoad);
     return True;
   }
 }
@@ -99,6 +99,7 @@ interface Node{
     availableMemory = memory;
     systemCpuLoad = baseSystemCpuLoad;
     this!resetResources();
+    this!consumeSystemLoad();
   }
 
   String getName(){
@@ -141,7 +142,7 @@ interface Node{
 
   // consumes an amount of the system load, called during pod consumptions
   Unit consumeSystemCpu(Rat amount){
-    if (amount >= systemCpuLoad){
+    if (amount <= systemCpuLoad){
       availableCpu = availableCpu - amount;
       systemCpuLoad = systemCpuLoad - amount;
     }else{
@@ -150,10 +151,10 @@ interface Node{
     }
   }
 
-  Rat consumeCpu(Rat amount,Pod p,Rat systemConsumptionRate){
+  Rat consumeCpu(Rat amount,Pod p,Rat reqSysLoadPerUnit){
     Bool done = False;
     Rat timeFraction = 0;
-    Rat generatedSysLoad = amount * systemConsumptionRate;
+    Rat generatedSysLoad = amount * reqSysLoadPerUnit;
     Rat servAvailCpu = 0;
 
     while (!done){
@@ -168,7 +169,7 @@ interface Node{
         timeFraction = (cpu - availableCpu) / cpu;
 
         // consumes the same amount of system load
-        this.consumeSystemCpu(amount);
+        this.consumeSystemCpu(amount/10);
 
         done = True;
       } else {
@@ -255,7 +256,7 @@ interface Node{
 //
 interface NodeScheduler{
   //create nNodes with given cpu and memory amounts.
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption);
 
   List<NodeState> getNodeStates();
   List<Node> getNodes();

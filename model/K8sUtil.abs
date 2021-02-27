@@ -10,7 +10,7 @@ import * from K8sMaster;
 type RequestType = String;
 type ConsumptionMap = Map<Int,Rat>;
 
-data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize, Rat timeBaseline);
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize, Rat timeBaseline, Rat cpuSysLoadPerCostUnit);
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
