@@ -134,6 +134,9 @@ interface Pod {
 
     Rat requestsPerCostUnit = batchSize(request) / requestCost(request);
 
+    Rat fraction = await node!getTimeFraction();
+    started = Time(timeValue(now()) + fraction);
+
     this.allocateMemory(requiredMemory);
     monitor!consumedMemoryUpdate(requiredMemory);
 
@@ -189,7 +192,7 @@ interface Pod {
     monitor!consumedMemoryUpdate(-requiredMemory);
 
     Rat averageTimeSpent = timeDifference(Time(totalTime / batchSize(request)),started);
-    println("totalTimeSpent: " + toString(float(totalTime)) + "  nReq: " + toString(batchSize(request)));
+    //println("totalTimeSpent: " + toString(float(totalTime)) + "  nReq: " + toString(batchSize(request)));
     //Bool success = (spentTime <= durationValue(deadline));
 
     this.activeRequests = this.activeRequests - 1;

@@ -66,6 +66,7 @@ interface Node{
   NodeResourcesMonitor getMonitor();
   //Use Node cpu, equivalent to [Cost: amount] skip;
   Rat consumeCpu(Rat amount,Pod p,Rat systemConsumptionRate);
+  Rat getTimeFraction();
 
   Rat allocateMemory(Rat amount);
   Rat releaseMemory(Rat amount);
@@ -112,6 +113,11 @@ interface Node{
 
   NodeResourcesMonitor getMonitor(){
     return this.monitor;
+  }
+
+  Rat getTimeFraction(){
+    Rat timeFraction = (cpu - availableCpu) / cpu;
+    return timeFraction;
   }
 
   // Sets the consumptions on the monitor and reset the availableCpu to the full value.
@@ -166,7 +172,7 @@ interface Node{
         systemCpuLoad = systemCpuLoad + generatedSysLoad;
 
         //based on consumed cpu, example: half cpu consumed -> half time unit passed
-        timeFraction = (cpu - availableCpu) / cpu;
+        timeFraction = this.getTimeFraction();
 
         // consumes the same amount of system load
         this.consumeSystemCpu(amount/10);

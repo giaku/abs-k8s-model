@@ -25,10 +25,19 @@ class ServiceRequest(ServiceEndpoint se, Request request) implements ServiceTask
 class ServiceWorkflow(List<List<ServiceTask>> tasks, Rat workflowBaseline, PolyFunction pf) implements ServiceTask{
   Rat execute(){
     Rat totalRtDelay = 0;
+    List<Fut<Rat>> timeFuts = list[];
 
     foreach (tList in tasks){
-      Rat rtDelay = this.executeParallel(tList);
-      totalRtDelay = totalRtDelay + rtDelay;
+      Fut<Rat> timeFut = this!executeParallel(tList);
+      timeFuts = appendright(timeFuts,timeFut);
+    }
+
+    foreach (tf in timeFuts){
+      await tf?;
+      Rat t = tf.get;
+      if (t > totalRtDelay){
+        totalRtDelay = t;
+      }
     }
 
     // compute baseline response time + delay caused response time
