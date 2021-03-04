@@ -14,8 +14,9 @@ data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
-data PodConfig = PodConfig(Rat compUnitSize, Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit);
-data ServiceConfig = ServiceConfig(String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle, Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod);
+data PodConfig = PodConfig(Rat compUnitSize, Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit, Int costGranularity);
+data ServiceConfig = ServiceConfig(String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle,
+                                   Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod);
 
 data PodState = PodState(String serviceName, Int podID, String nodeName, Rat cpuConsumption, Rat memoryConsumption, Rat consumptionRatio);
 data NodeState = NodeState(String nName, Int nOfPods, Rat cpuLoad, Rat allocatedMemory, Rat totalCpu, Rat totalMemory, Rat requestedCpu);

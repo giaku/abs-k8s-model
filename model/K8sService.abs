@@ -90,7 +90,7 @@ interface Pod {
 }
 
 [Scheduler: reset_availCpu_scheduler(queue)] class PodObject(String serviceName, Int id, Rat compUnitSize, Rat cpuRequest, Rat cpuLimit,
-                                                             ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle) implements Pod {
+                                                             ResourcesMonitor monitor, Rat insufficientMemCooldown, Rat refCycle, Int costGranularity) implements Pod {
   Bool executing = False;
   Bool blocked = False;
 
@@ -132,6 +132,11 @@ interface Pod {
     Rat cost = requestCost(request);
     Rat requiredMemory = memory(request);
 
+    Rat computationStep = (cost / costGranularity) * compUnitSize;
+    if (computationStep < 1){
+      computationStep = 1;
+    }
+
     Rat requestsPerCostUnit = batchSize(request) / requestCost(request);
 
     Rat fraction = await node!getTimeFraction();
@@ -146,19 +151,19 @@ interface Pod {
       await !executing;
       this.executing = True;
 
-      if (cost > compUnitSize){
+      if (cost > computationStep){
         await this.availableCpu > 0;
-        Rat timeUnitFraction = await node!consumeCpu(compUnitSize,this,cpuSysLoadPerCostUnit(request));
+        Rat timeUnitFraction = await node!consumeCpu(computationStep,this,cpuSysLoadPerCostUnit(request));
         //println("timeUnitFraction: " + toString(timeUnitFraction));
 
         await !this.blocked;
 
-        availableCpu = availableCpu - compUnitSize;
-        monitor!consumeCpu(compUnitSize);
+        availableCpu = availableCpu - computationStep;
+        monitor!consumeCpu(computationStep);
 
-        cost = cost - compUnitSize;
+        cost = cost - computationStep;
 
-        Rat processedRequests = requestsPerCostUnit * compUnitSize;
+        Rat processedRequests = requestsPerCostUnit * computationStep;
         remainingRequests = remainingRequests - processedRequests;
         monitor!updateActiveRequests(-processedRequests);
 
@@ -440,7 +445,8 @@ class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, S
 
   Unit launchPod(){
     ResourcesMonitor rm = new ResourcesMonitorObject(name(sConfig), this.nextID, monitorCycle(pConfig),cpuRequest(pConfig));
-    Pod p = new PodObject(name(sConfig), this.nextID, compUnitSize(pConfig), cpuRequest(pConfig), cpuLimit(pConfig), rm, memoryCooldown(pConfig), 1);
+    Pod p = new PodObject(name(sConfig), this.nextID, compUnitSize(pConfig), cpuRequest(pConfig), cpuLimit(pConfig), rm,
+                          memoryCooldown(pConfig), 1, costGranularity(pConfig));
 
     rm!setPod(p);
     Node n = await scheduler!deployPod(p,rm);

@@ -20,7 +20,7 @@ interface Master{
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad);
 }
-class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle) implements Master{
+class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle, Int costGranularity) implements Master{
   NodeScheduler scheduler;
 
   {
@@ -53,7 +53,7 @@ class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resou
   }
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad){
-    await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize, baseSystemLoad);
+    await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize, baseSystemLoad, costGranularity);
     return True;
   }
 }
@@ -80,13 +80,14 @@ interface Node{
   Rat getAvailableCpu();
 }
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
-                                                                    Rat baseSystemCpuLoad, NodeResourcesMonitor monitor) implements Node{
+                                                                    Rat baseSystemCpuLoad, NodeResourcesMonitor monitor, Int costGranularity) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
   Bool refreshed = False;
   Bool memoryLock = False;
   Bool computing = False;
+  Bool sysLoadInterleaving = False; // to interleave pods and system consumptions on the node
 
   Rat availableCpu = 0;
   Rat availableMemory = 0;
@@ -94,13 +95,17 @@ interface Node{
 
   Rat requestedCpu = 0;
 
+  Int remainingSysLoadSteps = 0;
+
   {
     this.name = ("Node-" + toString(id));
     availableCpu = cpu;
     availableMemory = memory;
     systemCpuLoad = baseSystemCpuLoad;
+    remainingSysLoadSteps = costGranularity;
     this!resetResources();
     this!consumeSystemLoad();
+    this!consumeSystemCpu();
   }
 
   String getName(){
@@ -129,6 +134,7 @@ interface Node{
 
     availableCpu = cpu;
     systemCpuLoad = baseSystemCpuLoad;
+    remainingSysLoadSteps = costGranularity;
 
     await duration(cycle,cycle);
 
@@ -140,21 +146,31 @@ interface Node{
     await duration(cycle/2,cycle/2);
 
     availableCpu = availableCpu - systemCpuLoad;
+    //println("SYSTEM consumed: " + toString(systemCpuLoad) + " SYSTEM DISCHARGE");
+    systemCpuLoad = 0;
 
     await duration(cycle/2,cycle/2);
 
     this!consumeSystemLoad();
   }
 
-  // consumes an amount of the system load, called during pod consumptions
-  Unit consumeSystemCpu(Rat amount){
-    if (amount <= systemCpuLoad){
-      availableCpu = availableCpu - amount;
-      systemCpuLoad = systemCpuLoad - amount;
-    }else{
-      availableCpu = availableCpu - systemCpuLoad;
-      systemCpuLoad = 0;
-    }
+  // consumes part of the system load
+  Unit consumeSystemCpu(){
+    await sysLoadInterleaving;
+    await (remainingSysLoadSteps > 0);
+
+
+    Rat toConsume = systemCpuLoad / remainingSysLoadSteps;
+
+    availableCpu = availableCpu - toConsume;
+    systemCpuLoad = systemCpuLoad - toConsume;
+
+    remainingSysLoadSteps = remainingSysLoadSteps - 1;
+    sysLoadInterleaving = False;
+
+    //println("SYSTEM consumed: " + toString(float(toConsume)) + "  remaining steps: " + toString(remainingSysLoadSteps));
+
+    this!consumeSystemCpu();
   }
 
   Rat consumeCpu(Rat amount,Pod p,Rat reqSysLoadPerUnit){
@@ -174,10 +190,10 @@ interface Node{
         //based on consumed cpu, example: half cpu consumed -> half time unit passed
         timeFraction = this.getTimeFraction();
 
-        // consumes the same amount of system load
-        this.consumeSystemCpu(amount/10);
-
+        sysLoadInterleaving = True;
         done = True;
+
+        //println(toString(p) + " consumed: " + toString(float(amount)) + " generated: " + toString(float(generatedSysLoad)) + " system load");
       } else {
         //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
         amount = amount - servAvailCpu;
@@ -186,7 +202,6 @@ interface Node{
         systemCpuLoad = systemCpuLoad + generatedSysLoad;
         generatedSysLoad = 0;
 
-        this.consumeSystemCpu(servAvailCpu);
         //println("blocking pod: " + toString(p));
         p!setBlocked();
 
@@ -262,7 +277,7 @@ interface Node{
 //
 interface NodeScheduler{
   //create nNodes with given cpu and memory amounts.
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption, Int costGranularity);
 
   List<NodeState> getNodeStates();
   List<Node> getNodes();
@@ -281,11 +296,11 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
   // pod deploy lock
   Bool deploying = False;
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption){
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption, Int costGranularity){
     Int ctr = 0;
     while (ctr < nNodes) {
       NodeResourcesMonitor monitor = new NodeResourcesMonitorObject(resourceCycle,cpu,memory);
-      Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle, baseSysConsumption, monitor);
+      Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle, baseSysConsumption, monitor, costGranularity);
       await monitor!setNode(node);
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);

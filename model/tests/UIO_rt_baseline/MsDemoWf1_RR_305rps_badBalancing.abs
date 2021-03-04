@@ -54,33 +54,34 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
 
 {
   Int timeUnitSize = 2;
+  Int costGranularity = 100;
 
   CloudProvider cp = new CloudProvider("Cloud");
-  Master master = new MasterObject(cp,timeUnitSize,1,1);
+  Master master = new MasterObject(cp, timeUnitSize, 1, 1, costGranularity);
   Bool fb = master.createNodes(4,4000,4000,100);
 
   ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig emailservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig emailservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig checkoutservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig checkoutservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig recommendationservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig recommendationservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 1, 1, 1, 1, 80/100, 5/100, 10);
-  PodConfig frontendPodConfig = PodConfig(1, 1, 0, 600, 3000);
+  PodConfig frontendPodConfig = PodConfig(1, 1, 0, 600, 3000, costGranularity);
   ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig paymentservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig paymentservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig productcatalogservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig productcatalogservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig cartservicePodConfig = PodConfig(1, 1, 0, 200, 500);
+  PodConfig cartservicePodConfig = PodConfig(1, 1, 0, 200, 500, costGranularity);
   ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 1, 1, 1, 1, 80/100, 5/100, 10);
-  PodConfig currencyservicePodConfig = PodConfig(1, 1, 0, 600, 3000);
+  PodConfig currencyservicePodConfig = PodConfig(1, 1, 0, 600, 3000, costGranularity);
   ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig shippingservicePodConfig = PodConfig(1, 1, 0, 100, 500);
+  PodConfig shippingservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig rediscartServiceConfig = ServiceConfig("rediscart", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig rediscartPodConfig = PodConfig(1, 1, 0, 70, 500);
+  PodConfig rediscartPodConfig = PodConfig(1, 1, 0, 70, 500, costGranularity);
   ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 2, 1, 30, 1, 80/100, 5/100, 10);
-  PodConfig adservicePodConfig = PodConfig(1, 1, 0, 200, 500);
+  PodConfig adservicePodConfig = PodConfig(1, 1, 0, 200, 500, costGranularity);
 
 
   ServiceLoadBalancerPolicy policy = new RoundRobinLbPolicy();
