@@ -58,6 +58,13 @@ def Rat maybeZero(Maybe<Rat> x) =
     | _ => 0
   };
 
+// puts the first element of a list of Int in the last position of the list
+def List<Int> cycleIntList(List<Int> x) =
+  case x {
+    Cons(h,t) => appendright(t,h)
+    | _ => x
+  };
+
 // defines a function structured as different polynomes depending on value thresholds
 // for n coefficients lists => n - 1 thresholds
 data PolyFunction = PolyFunction(List<List<Float>> coeffList, List<Float> thresholds);
@@ -93,6 +100,7 @@ interface ResourcesMonitor{
   Unit shutdown();
 
   PodState getPodState();
+  String getServiceName();
   Node getNode();
   Unit setNode(Node n);
 }
@@ -203,6 +211,10 @@ interface ResourcesMonitor{
     PodState ps = PodState(this.serviceName, this.id, this.nodeName, this.cpuDisplay, this.memoryDisplay, this.cpuConsumptionRatio);
 
     return ps;
+  }
+
+  String getServiceName(){
+    return this.serviceName;
   }
 
   Node getNode(){
@@ -321,6 +333,13 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
 //
 // PRINTER
 //
+
+
+def String formatInt3(Int x) =
+  when (x < 10) then "  " + toString(x)
+  else when (x < 100) then " " + toString(x)
+  else toString(x);
+
 interface Printer{
   Unit printNodesStates(List<NodeState> list);
   Unit printServiceStatus(Service s);
@@ -336,14 +355,22 @@ interface Printer{
   Unit printMaps(List<Pair<String,ConsumptionMap>> maps, Int tFrom, Int tTo);
 
 }
+
 class PrinterObject() implements Printer {
 
   Unit printNodesStates(List<NodeState> list){
     println("MASTER STATUS:");
 
     foreach (state in list){
-      println("Node: " + nName(state) + "   Pods: " + toString(nOfPods(state)) +
+      String nPods = "";
+      if (nOfPods(state) < 10){
+        nPods = " " + toString(nOfPods(state));
+      } else {
+        nPods = toString(nOfPods(state));
+      }
+      println("Node: " + nName(state) + "   Pods: " + nPods +
               "   Cpu Load : " + toString(truncate(cpuLoad(state))) + " / " + toString(totalCpu(state)) +
+              " [ " + formatInt3(truncate(cpuLoad(state)/totalCpu(state)*100)) + "% ] " +
               "   Requested Cpu : " + toString(requestedCpu(state)) + " / " + toString(totalCpu(state)) +
               "   Allocated Memory : " + toString(truncate(allocatedMemory(state))) + " / " + toString(totalMemory(state))
               );

@@ -19,6 +19,8 @@ interface Master{
   List<Pair<String,ConsumptionMap>> getNodesMap();
 
   Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad);
+
+  Unit setSchedulerRulesMap(Map<String,List<Int>> rulesMap);
 }
 class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle, Int costGranularity) implements Master{
   NodeScheduler scheduler;
@@ -55,6 +57,10 @@ class MasterObject(CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resou
   Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad){
     await this.scheduler!createNodes(nNodes, cpu, memory, timeUnitSize, baseSystemLoad, costGranularity);
     return True;
+  }
+
+  Unit setSchedulerRulesMap(Map<String,List<Int>> rulesMap){
+    await this.scheduler!setRulesMap(rulesMap);
   }
 }
 
@@ -283,15 +289,20 @@ interface NodeScheduler{
   List<Node> getNodes();
 
   Node deployPod(Pod p,ResourcesMonitor rm);
+
+  Unit setRulesMap(Map<String,List<Int>> rulesMap);
 }
 
 //loadPeriod: period to consider to select the less loaded node
 class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle) implements NodeScheduler{
+  // map of id:node
+  Map<Int,Node> nodesMap = map[];
+  Map<String,List<Int>> rulesMap = map[];
   // static list of all the nodes
   List<Node> nodes = list[];
   // list used to schedule new pods, can change order
   List<Node> activeNodes = list[];
-  Int nextID = 0;
+  Int nextID = 1;
 
   // pod deploy lock
   Bool deploying = False;
@@ -304,6 +315,7 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
       await monitor!setNode(node);
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
+      nodesMap = insert(nodesMap,Pair(nextID,node));
       this.nextID = nextID + 1;
       ctr = ctr + 1;
     }
@@ -315,14 +327,29 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
   Node deployPod(Pod p, ResourcesMonitor rm){
     Bool deployed = False;
     Rat requestedCpu = await rm!getCpuRequest();
+    String serviceName = await rm!getServiceName();
     Node result = null;
+    List<Node> nodesToCheck = list[];
+
+    List<Int> nodeIds = lookupDefault(rulesMap,serviceName,list[]);
+
+    if (!isEmpty(nodeIds)){
+      Node selected = lookupDefault(nodesMap,head(nodeIds),null);
+      if (selected != null){
+        nodesToCheck = list[selected];
+        rulesMap = put(rulesMap,serviceName,cycleIntList(nodeIds)); // put the first node at the bottom of the list of the rule
+      }
+    }
+
+    if (isEmpty(nodesToCheck)){ // standard behavior
+      await (!isEmpty(activeNodes));
+      nodesToCheck = activeNodes;
+    }
 
     while (!deployed){
       await !deploying;
       this.deploying = True;
-      result =  head(activeNodes);
-      Rat maxCpu = await result!getAvailableCpu();
-      List<Node> nodesToCheck = tail(activeNodes);
+      Rat maxCpu = -1;
 
       foreach ( n in nodesToCheck){
         Rat cpu = await n!getAvailableCpu();
@@ -360,4 +387,7 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
     return this.nodes;
   }
 
+  Unit setRulesMap(Map<String,List<Int>> rulesMap){
+    this.rulesMap = rulesMap;
+  }
 }
