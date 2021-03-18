@@ -473,11 +473,11 @@ class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, S
 // SERVICE ENDPOINT
 //
 interface ServiceEndpoint {
-  Rat invokeService(Request request);
+  Rat invokeService(Request request, PolyFunction pf);
 }
 class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
 
-  Rat invokeService(Request request){
+  Rat invokeService(Request request, PolyFunction pf){
     Time started = now();
     Rat responseTime = 0;
 
@@ -525,6 +525,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       Fut<Rat> v = fst(p);
       await v?;
       Rat val = v.get;
+      val = rat(polFuncEval(pf,float(val)));
 
       responseTime = responseTime + (val * snd(p));
       avgResponseTimes = tail(avgResponseTimes);

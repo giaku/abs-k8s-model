@@ -18,7 +18,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
     Int counter = times;
 
     while(counter > 0){
-      Fut<Rat> fTime = t!execute();
+      Fut<Rat> fTime = t!executeWorkflow();
       rTimes = appendright(rTimes,fTime);
       counter = counter - 1;
 
@@ -66,7 +66,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   PodConfig checkoutservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig recommendationservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
-  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 3, 3, 3, 1, 80/100, 5/100, 10);
+  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 5, 5, 5, 1, 80/100, 5/100, 10);
   PodConfig frontendPodConfig = PodConfig(1, 1, 0, 600, 3000, costGranularity);
   ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig paymentservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);

@@ -57,7 +57,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   Int costGranularity = 100;
 
   CloudProvider cp = new CloudProvider("Cloud");
-  Master master = new MasterObject(cp, timeUnitSize, 1, 1, costGranularity);
+  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity);
   Bool fb = master.createNodes(4,4000,4000,100);
 
   ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
@@ -66,7 +66,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   PodConfig checkoutservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig recommendationservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
-  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 1, 1, 1, 1, 80/100, 5/100, 10);
+  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 5, 5, 5, 1, 80/100, 5/100, 10);
   PodConfig frontendPodConfig = PodConfig(1, 1, 0, 600, 3000, costGranularity);
   ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig paymentservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
@@ -74,14 +74,20 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   PodConfig productcatalogservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig cartservicePodConfig = PodConfig(1, 1, 0, 200, 500, costGranularity);
-  ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 1, 1, 1, 1, 80/100, 5/100, 10);
-  PodConfig currencyservicePodConfig = PodConfig(1, 1, 0, 600, 3000, costGranularity);
+  ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 5, 5, 5, 1, 80/100, 5/100, 10);
+  PodConfig currencyservicePodConfig = PodConfig(1, 1, 0, 600, 1000, costGranularity);
   ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig shippingservicePodConfig = PodConfig(1, 1, 0, 100, 500, costGranularity);
   ServiceConfig rediscartServiceConfig = ServiceConfig("rediscart", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig rediscartPodConfig = PodConfig(1, 1, 0, 70, 500, costGranularity);
   ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig adservicePodConfig = PodConfig(1, 1, 0, 200, 500, costGranularity);
+
+  Map<String,List<Int>> rulesMap = map[];
+  rulesMap = put(rulesMap,"frontend",list[1,3]);
+  rulesMap = put(rulesMap,"currencyservice",list[2,4]);
+
+  master.setSchedulerRulesMap(rulesMap);
 
 
   ServiceLoadBalancerPolicy policy = new RoundRobinLbPolicy();
@@ -128,13 +134,13 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   ServiceEndpoint rediscartEP = await rediscart!getServiceEndpoint();
   ServiceEndpoint adserviceEP = await adservice!getServiceEndpoint();
 
-  Int batchSize = 305;
+  Int batchSize = 320;
 
-  Request request1 = Request("request_1", 2800, 1, batchSize, 0, 1/20);
-  Request request2 = Request("request_2", 2700, 1, batchSize, 0, 1/20);
-  Request request3 = Request("request_3", 450, 1, batchSize, 0, 1/20);
-  Request request4 = Request("request_4", 260, 1, batchSize, 0, 1/20);
-  Request request5 = Request("request_5", 250, 1, batchSize, 0, 1/20);
+  Request request1 = Request("request_1", 3600, 1, batchSize, 0, 1/20);
+  Request request2 = Request("request_2", 2600, 1, batchSize, 0, 1/20);
+  Request request3 = Request("request_3", 400, 1, batchSize, 0, 1/20);
+  Request request4 = Request("request_4", 330, 1, batchSize, 0, 1/20);
+  Request request5 = Request("request_5", 230, 1, batchSize, 0, 1/20);
 
   ServiceTask frontendTask = new ServiceRequest(frontendEP,request1);
   ServiceTask currencyTask = new ServiceRequest(currencyserviceEP,request2);
@@ -142,19 +148,22 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   ServiceTask productcatalogTask = new ServiceRequest(productcatalogserviceEP,request4);
   ServiceTask adTask = new ServiceRequest(adserviceEP,request5);
 
-  PolyFunction wf1Pf = PolyFunction(list[list[1863994.69749283,-1373872.18680479,358906.779556025,-38339.2094534745,1414.46977103946,-0.0833391048692793]],list[]);
+  PolyFunction wf1Pf = PolyFunction(list[list[281.632947435528,-24.8783422825102,0.0563992273264907],
+                                         list[392.452406432068,-55.0177251184715,2.70959245914725],
+                                         list[6581.82486053585,-3135.55575546095,386.352603687442]],
+                                    list[0.1289375,0.23715625]);
   ServiceTask workflow1 = new ServiceWorkflow(Cons(list[frontendTask],Cons(list[currencyTask,cartTask,productcatalogTask,adTask],Nil)),35,wf1Pf);
   //ServiceTask workflow2 = new ServiceWorkflow(list[list[adTask],list[workflow1]]);
 
   Printer printer = new PrinterObject();
   List<Service> sList = list[frontend,currencyservice,cartservice,productcatalogservice,adservice];
 
-  printer!printStatus(master,sList,60,1);
+  printer!printStatus(master,sList,80,1);
 
   await duration(5,5);
 
   //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
-  Client c1 = new ClientWorkflow(workflow1,50,rat(1.0),10);
+  Client c1 = new ClientWorkflow(workflow1,70,rat(1.0),10);
   List<Rat> rts = await c1!start();
 
   foreach (t in rts){
