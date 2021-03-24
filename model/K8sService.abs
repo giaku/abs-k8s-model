@@ -190,7 +190,7 @@ interface Pod {
       }
       this.executing = False;
 
-      suspend;
+      await duration(1/100000,1/100000);
     }
 
     this.releaseMemory(requiredMemory);
@@ -525,6 +525,7 @@ class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
       Fut<Rat> v = fst(p);
       await v?;
       Rat val = v.get;
+      //println(requestType(request) + "  delay: " + toString(float(val)));
       val = rat(polFuncEval(pf,float(val)));
 
       responseTime = responseTime + (val * snd(p));
@@ -774,5 +775,70 @@ class RoundRobinLbPolicy() implements ServiceLoadBalancerPolicy {
     Unit setLb(ServiceLoadBalancer lb){
       this.lb = lb;
       this!refreshPods();
+    }
+  }
+
+  class FixedLbPolicy(List<Float> pLoads) implements ServiceLoadBalancerPolicy {
+    ServiceLoadBalancer lb;
+
+    Map<Pod,Int> distributeRequest(Request req, List<Pod> actPods){
+      List<Pod> activePods = map((Pod a) => a)(actPods);
+      List<Float> podsLoads = map((Float a) => a)(pLoads);
+      //println("POLICY distributeRequest STARTED");
+      Map<Pod,Int> result = map[];
+      //println(toString(lb));
+      Int nPods = length(activePods);
+      Int nLoads = length(podsLoads);
+      Int effectivePods = 0;
+      Pod p = null;
+
+      if (nLoads <= nPods){
+        effectivePods = nLoads;
+      } else {
+        effectivePods = nPods;
+        Int i = 0;
+        List<Float> loads = list[];
+        while(i < effectivePods){
+          Float v1 = head(podsLoads);
+          podsLoads = tail(podsLoads);
+          loads = appendright(loads,v1);
+          i = i + 1;
+        }
+        podsLoads = loads;
+      }
+
+      Int batchSize = batchSize(req);
+      Int remainingBsize = batchSize;
+
+      Float totalCons = foldl((Float a,Float b) => b + a)(podsLoads,0.0);
+      Int c = 0;
+      while (c < effectivePods){
+        p = head(activePods);
+        activePods = tail(activePods);
+
+        Float v = head(podsLoads);
+        podsLoads = tail(podsLoads);
+
+        Int size = floor(float(batchSize) * (v/totalCons));
+
+        if (c == (effectivePods - 1)){
+          size = remainingBsize;
+        }
+
+        result = put(result, p, size);
+        remainingBsize = remainingBsize - size;
+
+        c = c + 1;
+      }
+      //println("NPODS:" + toString(nPods));
+
+      //println("batchSize:" + toString(batchSize));
+
+      //println("POLICY distributeRequest END");
+      return result;
+    }
+
+    Unit setLb(ServiceLoadBalancer lb){
+      this.lb = lb;
     }
   }

@@ -40,7 +40,7 @@ class ServiceWorkflow(List<List<ServiceTask>> tasks, Rat workflowBaseline, PolyF
 
     // compute baseline response time + delay caused response time
     Rat responseTime = workflowBaseline + totalRtDelay;
-    println("WORKFLOW_BASELINE: " + toString(workflowBaseline) + "  CONSUMPTION_DELAY_RT: " + toString(float(totalRtDelay)));
+    println("{TIME " + toString(timeValue(now())) + "} " + "WORKFLOW_BASELINE: " + toString(workflowBaseline) + "  CONSUMPTION_DELAY_RT: " + toString(float(totalRtDelay)));
 
     return responseTime;
   }

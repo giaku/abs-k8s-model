@@ -54,7 +54,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
 
 {
   Int timeUnitSize = 2;
-  Int costGranularity = 100;
+  Int costGranularity = 40;
 
   CloudProvider cp = new CloudProvider("Cloud");
   Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity);
@@ -100,7 +100,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   Service checkoutservice = new ServiceObject(checkoutserviceServiceConfig, checkoutservicePodConfig, policy);
   policy = new RoundRobinLbPolicy();
   Service recommendationservice = new ServiceObject(recommendationserviceServiceConfig, recommendationservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
+  policy = new FixedLbPolicy(list[0.6,0.6,0.6,0.6,0.3,0.1,0.1,0.1]);
   Service frontend = new ServiceObject(frontendServiceConfig, frontendPodConfig, policy);
   policy = new RoundRobinLbPolicy();
   Service paymentservice = new ServiceObject(paymentserviceServiceConfig, paymentservicePodConfig, policy);

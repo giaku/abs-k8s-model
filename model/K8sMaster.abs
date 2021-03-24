@@ -152,7 +152,7 @@ interface Node{
     await duration(cycle/2,cycle/2);
 
     availableCpu = availableCpu - systemCpuLoad;
-    //println("SYSTEM consumed: " + toString(systemCpuLoad) + " SYSTEM DISCHARGE");
+    //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "]" + "SYSTEM consumed: " + toString(systemCpuLoad) + " SYSTEM DISCHARGE");
     systemCpuLoad = 0;
 
     await duration(cycle/2,cycle/2);
@@ -174,7 +174,7 @@ interface Node{
     remainingSysLoadSteps = remainingSysLoadSteps - 1;
     sysLoadInterleaving = False;
 
-    //println("SYSTEM consumed: " + toString(float(toConsume)) + "  remaining steps: " + toString(remainingSysLoadSteps));
+    //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "]" + "SYSTEM consumed: " + toString(float(toConsume)) + "  remaining steps: " + toString(remainingSysLoadSteps));
 
     this!consumeSystemCpu();
   }
@@ -199,7 +199,7 @@ interface Node{
         sysLoadInterleaving = True;
         done = True;
 
-        //println(toString(p) + " consumed: " + toString(float(amount)) + " generated: " + toString(float(generatedSysLoad)) + " system load");
+        //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "] - " + toString(p) + " consumed: " + toString(float(amount)) + " generated: " + toString(float(generatedSysLoad)) + " system load");
       } else {
         //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
         amount = amount - servAvailCpu;

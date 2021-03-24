@@ -38,7 +38,10 @@ def Process reset_availCpu_scheduler(List<Process> queue) =
 def Process node_reset_resources_scheduler(List<Process> queue) =
   let List<Process> others = filter((Process x) => method(x) == "resetResources") (queue) in
     when (!isEmpty(others))// a < b
-      then head(others) else head(queue);
+      then oldestInQueue(others) else head(queue);
+
+def Process oldestInQueue(List<Process> queue) =
+  foldl((Process a,Process b) => when timeLessThan(arrival(a),arrival(b)) then a else b)(queue,head(queue));
 
 def Process weightedLeastReqLbPolicy_scheduler(List<Process> queue) =
   let List<Process> others = filter((Process x) => method(x) == "refreshPods") (queue) in
