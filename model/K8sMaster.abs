@@ -107,6 +107,8 @@ interface Node{
     this.name = ("Node-" + toString(id));
     availableCpu = cpu;
     availableMemory = memory;
+    println("TYPE:" + "node_creation" + " " + "TU:" + toString(now()) + " " + "NODE:" + this.name + " " + "CPU_CAPACITY:" + toString(cpu)
+            + " " + "MEMORY_CAPACITY:" + toString(memory));
     systemCpuLoad = baseSystemCpuLoad;
     remainingSysLoadSteps = costGranularity;
     this!resetResources();
@@ -316,6 +318,7 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
       nodesMap = insert(nodesMap,Pair(nextID,node));
+
       this.nextID = nextID + 1;
       ctr = ctr + 1;
     }

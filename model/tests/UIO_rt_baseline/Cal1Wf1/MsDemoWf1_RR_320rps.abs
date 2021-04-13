@@ -155,7 +155,7 @@ class ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity) imp
   ServiceTask workflow1 = new ServiceWorkflow(Cons(list[frontendTask],Cons(list[currencyTask,cartTask,productcatalogTask,adTask],Nil)),35,wf1Pf);
   //ServiceTask workflow2 = new ServiceWorkflow(list[list[adTask],list[workflow1]]);
 
-  Printer printer = new PrinterObject();
+  Printer printer = new PrinterObject2();
   List<Service> sList = list[frontend,currencyservice,cartservice,productcatalogservice,adservice];
 
   printer!printStatus(master,sList,80,1);

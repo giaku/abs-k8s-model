@@ -284,7 +284,7 @@ class NodeResourcesMonitorObject(Rat cycle, Rat totalCpu, Rat totalMemory) imple
 
     //update consumption history map
     Int time = truncate(timeValue(now()));
-    //this.consumptionMap = put(this.consumptionMap,time,value);
+    this.consumptionMap = put(this.consumptionMap,time,value);
   }
 
   Unit setConsumedMemory(Rat value){
@@ -397,6 +397,96 @@ class PrinterObject() implements Printer {
               );
     }
     println("");
+  }
+
+
+  Unit printNodes(Master m, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      List<NodeState> list = await m!getNodesStates();
+      this.printNodesStates(list);
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printService(Service s, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      this.printServiceStatus(s);
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printStatus(Master m, List<Service> sList, Int times, Rat interval){
+    Int ctr = times;
+    while (ctr > 0){
+      println("----------------------------- TIME " + toString(timeValue(now())) + " -----------------------------");
+      List<NodeState> list = await m!getNodesStates();
+      this.printNodesStates(list);
+      foreach (s in sList){
+        this.printServiceStatus(s);
+      }
+      println("------------------------------------------------------------------");
+      println("");
+
+      ctr = ctr - 1;
+
+      await duration(interval,interval);
+    }
+  }
+
+  Unit printMap(Pair<String,ConsumptionMap> map, Int tFrom, Int tTo){
+    println(fst(map) + " MAP:");
+    while (tFrom <= tTo){
+      Rat v = lookupDefault(snd(map),tFrom,-1);
+
+      if (v >= 0){
+        println("Time: " + toString(tFrom) + "  Val: " + toString(v));
+      }
+
+      tFrom = tFrom + 1;
+    }
+  }
+
+  Unit printMaps(List<Pair<String,ConsumptionMap>> maps, Int tFrom, Int tTo){
+    foreach (m in maps){
+      this.printMap(m,tFrom,tTo);
+    }
+  }
+}
+
+class PrinterObject2() implements Printer {
+
+  Unit printNodesStates(List<NodeState> list){
+
+    foreach (state in list){
+      println("TYPE:" + "node_podsNumber" + " " + "TU:" + toString(now()) + " " + "NODE:" + nName(state) + " " + "VALUE:" + toString(nOfPods(state)));
+      println("TYPE:" + "node_cpuLoad" + " " + "TU:" + toString(now()) + " " + "NODE:" + nName(state) + " " + "VALUE:" + toString(truncate(cpuLoad(state))));
+      println("TYPE:" + "node_cpuRequest" + " " + "TU:" + toString(now()) + " " + "NODE:" + nName(state) + " " + "VALUE:" + toString(requestedCpu(state)));
+    }
+  }
+
+  Unit printServiceStatus(Service s){
+    String serviceName = await s!getName();
+    ServiceState consumptions = await s!getConsumption();
+    Rat upscaleThreshold = await s!getUpscaleThreshold();
+    List<PodState> list = await s!getPodsConsumptions();
+
+    println("TYPE:" + "service_podsNumber" + " " + "TU:" + toString(now()) + " " + "SERVICE:" + serviceName + " " + "VALUE:" + toString(length(list)));
+    println("TYPE:" + "service_cpuLoad" + " " + "TU:" + toString(now()) + " " + "SERVICE:" + serviceName + " " + "VALUE:" + toString(truncate(cpuCsmpt(consumptions))));
+    println("TYPE:" + "service_requestUtil" + " " + "TU:" + toString(now()) + " " + "SERVICE:" + serviceName + " " + "VALUE:" + toString(truncate(cpuRatio(consumptions) * 100)));
+
+    foreach (state in list){
+
+      println("TYPE:" + "pod_cpuLoad" + " " + "TU:" + toString(now()) + " " + "SERVICE:" + serviceName + " "
+              + "NODE:" + nodeName(state) + " " + "POD:" + toString(podID(state)) + " " + "VALUE:" + toString(truncate(cpuConsumption(state))));
+      //println("TYPE:" + "pod_memoryAlloc" + " " + "TU:" + toString(now()) + " " + "SERVICE:" + serviceName + " "
+      //        + "NODE:" + nodeName(state) + " " + "POD:" + toString(podID(state)) + " " + "VALUE:" + toString(truncate(memoryConsumption(state))));
+    }
   }
 
 

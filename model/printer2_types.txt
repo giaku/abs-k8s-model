@@ -1,0 +1,10 @@
+node_creation   TU,NODE,CPU_LOAD,MEMORY
+node_podsNumber TU,NODE,VALUE
+node_cpuLoad    TU,NODE,VALUE
+node_cpuRequest TU,NODE,VALUE
+
+service_podsNumber  TU,SERVICE,VALUE
+service_cpuLoad     TU,SERVICE,VALUE
+service_requestUtil TU,SERVICE,VALUE
+
+pod_cpuLoad TU,SERVICE,NODE,POD,VALUE
