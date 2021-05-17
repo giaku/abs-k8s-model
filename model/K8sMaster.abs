@@ -71,8 +71,7 @@ interface Node{
   String getName();
   NodeResourcesMonitor getMonitor();
   //Use Node cpu, equivalent to [Cost: amount] skip;
-  Rat consumeCpu(Rat amount,Pod p,Rat systemConsumptionRate);
-  Rat getTimeFraction();
+  Unit consumeCpu(Rat amount,Pod p);
 
   Rat allocateMemory(Rat amount);
   Rat releaseMemory(Rat amount);
@@ -128,11 +127,6 @@ interface Node{
     return this.monitor;
   }
 
-  Rat getTimeFraction(){
-    Rat timeFraction = (cpu - availableCpu) / cpu;
-    return timeFraction;
-  }
-
   // Sets the consumptions on the monitor and reset the availableCpu to the full value.
   // this method is the last method called by the scheduler every time unit.
   Unit resetResources(){
@@ -167,7 +161,6 @@ interface Node{
     await sysLoadInterleaving;
     await (remainingSysLoadSteps > 0);
 
-
     Rat toConsume = systemCpuLoad / remainingSysLoadSteps;
 
     availableCpu = availableCpu - toConsume;
@@ -176,48 +169,29 @@ interface Node{
     remainingSysLoadSteps = remainingSysLoadSteps - 1;
     sysLoadInterleaving = False;
 
-    //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "]" + "SYSTEM consumed: " + toString(float(toConsume)) + "  remaining steps: " + toString(remainingSysLoadSteps));
-
     this!consumeSystemCpu();
   }
 
-  Rat consumeCpu(Rat amount,Pod p,Rat reqSysLoadPerUnit){
+  Unit consumeCpu(Rat amount,Pod p){
     Bool done = False;
-    Rat timeFraction = 0;
-    Rat generatedSysLoad = amount * reqSysLoadPerUnit;
     Rat servAvailCpu = 0;
 
     while (!done){
       await (availableCpu - systemCpuLoad) > 0;
-      servAvailCpu = availableCpu - (systemCpuLoad + generatedSysLoad);
+      servAvailCpu = availableCpu - systemCpuLoad;
 
       if (servAvailCpu >= amount){
         availableCpu = availableCpu - amount;
-        systemCpuLoad = systemCpuLoad + generatedSysLoad;
-
-        //based on consumed cpu, example: half cpu consumed -> half time unit passed
-        timeFraction = this.getTimeFraction();
 
         sysLoadInterleaving = True;
         done = True;
-
-        //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "] - " + toString(p) + " consumed: " + toString(float(amount)) + " generated: " + toString(float(generatedSysLoad)) + " system load");
       } else {
-        //println("availableCpu: " + toString(availableCpu) + " < " + "amount: " + toString(amount));
         amount = amount - servAvailCpu;
         availableCpu = availableCpu - servAvailCpu;
-
-        systemCpuLoad = systemCpuLoad + generatedSysLoad;
-        generatedSysLoad = 0;
-
-        //println("blocking pod: " + toString(p));
         p!setBlocked();
-
         await (availableCpu - systemCpuLoad) > 0;
       }
     }
-
-    return timeFraction;
   }
 
   Rat allocateMemory(Rat amount){

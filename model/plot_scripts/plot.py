@@ -6,8 +6,10 @@ Created on Sat Apr 10 14:12:09 2021
 """
 
 # Import the necessary packages and modules
+#import seaborn as sns
+import sys
 import matplotlib as mpl
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
 import output_p as out
 import numpy as np
@@ -74,7 +76,19 @@ def formatPodDataByNode(podReports):
     
     return result
             
-        
+def formatServiceDataByNode(serviceReports):
+    result = dict()
+
+    for r in serviceReports.values():
+        for node in r.getConsumptions().keys():
+            currList = result.get(node)
+            if currList == None:
+                currList = list()
+            xs,ys = tuplesToLists(r.getConsumptions().get(node))
+            currList.append((r.getName(),xs,ys))
+            result.update({node : currList})
+    
+    return result       
         
     
     
@@ -94,7 +108,7 @@ def plotData(axis,data,xlabel='',ylabel='',title=''):
         min_ys = min(min_ys,min(ys))
         
         axis.plot(xs,ys,label=label,alpha=0.7)
-
+        #sns.lineplot(data=(xs,ys),ax=axis)
     
    
     xSteps = 30
@@ -111,7 +125,7 @@ def plotData(axis,data,xlabel='',ylabel='',title=''):
     box = axis.get_position()
     axis.set_position([box.x0, box.y0,box.width * 0.9, box.height])
     
-    axis.legend(bbox_to_anchor=(1.00, 1.00),prop=FontProperties(size='small'))
+    axis.legend(loc='upper left',bbox_to_anchor=(1, 1),prop=FontProperties(size='small'))
     
     
 def roundAxisSteps(stepValue):
@@ -142,29 +156,49 @@ def plotPodReports(axis,reports):
         xs,ys = tuplesToLists(r.getConsumptions())
         axis.plot(xs,ys,label=r.getName())
 
+# -------- MAIN --------
+
 plt.close()
 mpl.use('WebAgg')
 
-filePath = 'out.txt'
+if (len(sys.argv) >= 2):
+    filePath = sys.argv[1]
+    fileName = filePath.split('.')[0]
+else:
+    raise Exception('Specify an input file')
+podReports = out.podReports(filePath)
 nodeLoads = formatDataToPlot(out.nodeCpuLoads(filePath))
 nodeLoadsPerc = formatDataToPlot(out.nodeCpuLoadsPerc(filePath))
-podReportsByNode = formatPodDataByNode(out.podReports(filePath))
+podReportsByNode = formatPodDataByNode(podReports)
+serviceReportsByNode = formatServiceDataByNode(out.ServiceReport.createFromPodReports(podReports.values()))
 
-rows = 6
+rows1 = 2
+rows2 = 4
+rows3 = 4
 
-fig,axs = plt.subplots(rows,1,figsize=(15,rows*6))
+fig1,axs1 = plt.subplots(rows1,1,figsize=(18,rows1*6))
+fig2,axs2 = plt.subplots(rows2,1,figsize=(18,rows2*6))
+fig3,axs3 = plt.subplots(rows3,1,figsize=(18,rows3*6))
 
-plotData(axs[0], nodeLoads,'Time Units','Millicores','Node Cpu Load')
-plotData(axs[1], nodeLoadsPerc,'Time Units','Load %','Node Cpu Load %')
-i = 2
+
+plotData(axs1[0], nodeLoads,'Time Units','Millicores','Node Cpu Load')
+plotData(axs1[1], nodeLoadsPerc,'Time Units','Load %','Node Cpu Load %')
+i = 0
+for n in serviceReportsByNode.keys():
+    plotData(axs2[i], serviceReportsByNode.get(n),'Time Units','Millicores','Services load by Node:' + n)
+    i = i+1
+i = 0
 for n in podReportsByNode.keys():
-    plotData(axs[i], podReportsByNode.get(n),'Time Units','Millicores','Pods load by Node:' + n)
+    plotData(axs3[i], podReportsByNode.get(n),'Time Units','Millicores','Pods load by Node:' + n)
     i = i+1
 
 
 
 
 #plt.plot()
+fig1.savefig(fileName + '_Nloads.pdf',dpi=fig1.dpi)
+fig2.savefig(fileName + '_Nloads_serv.pdf',dpi=fig2.dpi)
+fig3.savefig(fileName + '_Nloads_pods.pdf',dpi=fig3.dpi)
 
 plt.show()    
 # Prepare the data

@@ -10,11 +10,11 @@ import * from K8sMaster;
 type RequestType = String;
 type ConsumptionMap = Map<Int,Rat>;
 
-data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize, Rat timeBaseline, Rat cpuSysLoadPerCostUnit);
+data Request = Request(RequestType requestType, Rat requestCost, Rat memory, Int batchSize);
 
 data ServiceState = ServiceState(Rat cpuCsmpt, Rat memoryCsmpt, Rat cpuRatio);
 
-data PodConfig = PodConfig(Rat compUnitSize, Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit, Int costGranularity);
+data PodConfig = PodConfig(Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit, Int costGranularity);
 data ServiceConfig = ServiceConfig(String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle,
                                    Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod);
 

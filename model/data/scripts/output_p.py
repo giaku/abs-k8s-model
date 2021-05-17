@@ -4,7 +4,7 @@ Created on Sat Mar 27 12:49:56 2021
 
 @author: Utente
 """
-
+import pandas as pnd
 
 def nodeCpuLoads(filePath):
     """
@@ -268,6 +268,38 @@ class PodReport:
         return self.node
     def getConsumptions(self):
         return self.consumptions.copy()
+    
+    def toDf(self):
+        """
+        Generates a DataFrame with 'time-unit','value','pod','service','node'.
+        'value' is the cpu consumption.
+
+        Returns
+        -------
+        DataFrame
+            .
+
+        """
+        l = list()
+        
+        for c in self.consumptions:
+            t = (c[0],c[1],self.pod,self.service,self.node)
+            l.append(t)
+            
+        return pnd.DataFrame(l,columns=['time-unit','value','pod','service','node'])
+        
+    def prListToDf(podReports):
+        if isinstance(podReports, dict):
+            podReports = list(podReports.values())
+        
+        l = list()
+        
+        for pr in podReports:
+            for c in pr.getConsumptions():
+                t = (c[0],c[1],pr.getName(),pr.getService(),pr.getNode())
+                l.append(t)
+                
+        return pnd.DataFrame(l,columns=['time-unit','value','pod','service','node'])
       
 class ServiceReport:
     """

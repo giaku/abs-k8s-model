@@ -11,85 +11,34 @@ import * from K8sUtil;
 import * from ABS.Scheduler;*/
 
 interface ServiceTask{
-  Rat executeWorkflow();
-
-  Rat execute(PolyFunction pf);
-
-  Int getSize();
+  Unit execute();
 }
-class ServiceRequest(ServiceEndpoint se, Request request) implements ServiceTask{
-  Rat executeWorkflow(){
-    return 0;
-  }
 
-  Rat execute(PolyFunction pf){
-    Rat responseTimeDelay = await se!invokeService(request,pf);
-
-    return responseTimeDelay;
-  }
-
-  Int getSize(){
-    return 1;
+class ServiceRequest(ServiceEndpoint se, Request request) implements ServiceTask {
+  Unit execute(){
+    await se!invokeService(request);
   }
 }
-class ServiceWorkflow(List<List<ServiceTask>> tasks, Rat workflowBaseline, PolyFunction pf) implements ServiceTask{
-  Rat executeWorkflow(){
-    Int size = this.getSize();
-    Rat totalRtDelay = this.execute(pf);
-    totalRtDelay = totalRtDelay / size;
 
-    // compute baseline response time + delay caused response time
-    Rat responseTime = workflowBaseline + totalRtDelay;
-    println("{TIME " + toString(timeValue(now())) + "} " + "WORKFLOW_BASELINE: " + toString(workflowBaseline) + "  CONSUMPTION_DELAY_RT: " + toString(float(totalRtDelay)));
+class ServiceWorkflow(List<List<ServiceTask>> tasks) implements ServiceTask {
 
-    return responseTime;
-  }
-
-  Rat execute(PolyFunction pf){
-    Rat totalRtDelay = 0;
-    List<Fut<Rat>> timeFuts = list[];
-
+  Unit execute(){
     foreach (tList in tasks){
-      Fut<Rat> timeFut = this!executeParallel(tList);
-      timeFuts = appendright(timeFuts,timeFut);
+      this.executeParallel(tList);
     }
-
-    foreach (tf in timeFuts){
-      await tf?;
-      Rat t = tf.get;
-      totalRtDelay = totalRtDelay + t;
-    }
-
-    return totalRtDelay;
-  }
-  Rat executeParallel(List<ServiceTask> list){
-    Rat rTime = 0;
-    List<Fut<Rat>> timeFuts = list[];
-
-    foreach (task in list){
-      Fut<Rat> timeFut = task!execute(pf);
-      timeFuts = appendright(timeFuts,timeFut);
-    }
-
-    foreach (tf in timeFuts){
-      await tf?;
-      Rat t = tf.get;
-      rTime = rTime + t;
-    }
-
-    return rTime;
   }
 
-  Int getSize(){
-    Int result = 0;
+  Unit executeParallel(List<ServiceTask> list){
+    List<Fut<Unit>> res = list[];
 
-    foreach (tList in tasks){
-      foreach (t in tList){
-        Int tSize = await t!getSize();
-        result = result + tSize;
-      }
+    foreach (t in list){ // all called in parallel
+      Fut<Unit> f = t!execute();
+      res = appendright(res,f);
     }
 
-    return result;
+    foreach (r in res){ // wait for all to complete
+      await r?;
+    }
   }
+
 }
