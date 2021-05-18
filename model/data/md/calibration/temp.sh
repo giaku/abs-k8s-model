@@ -1,4 +1,6 @@
-for xx in `find . -mindepth 1 -maxdepth 1`
+for xxx in `find . -mindepth 1 -maxdepth 1`
+do
+for xx in `find $xxx -mindepth 1 -maxdepth 1`
 do
   #echo $xx
   if [ -d "$xx" ]
@@ -18,4 +20,5 @@ do
     done
   fi
   #mv -- "$x" "${x// /_}"
+done
 done
