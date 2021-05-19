@@ -4,7 +4,7 @@ Created on Fri May 14 10:52:24 2021
 
 @author: Utente
 """
-# import sys
+import sys
 import df_manip as dfm
 # import dfPlots as dfp
 # import pandas as pnd
@@ -55,6 +55,7 @@ def servicesConsumption(df, folder):
                 data=df, height=6, aspect=1.6, legend = False)
     g.set(xlabel='Average Load (Millicores)')
     g.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='source')
+    g.ax.grid(True,axis='x')
 
     plt.tight_layout()
     plt.savefig(folder + '\\serviceLoads.svg', format='svg')
@@ -70,8 +71,29 @@ def nodeLoads(df, folder):
     
     g = sns.catplot(x="millicores", y="node", hue="source", kind="swarm",
                 data=df, height=6, aspect=1.6, legend = False)
-    g.set(xlabel='Average Load (Millicores)', xlim=[0,4000])
+    g = (g.set(xlabel='Average Load (Millicores)', xlim=[0,4000]))
     g.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    g.ax.grid(True,axis='x')
+
+    plt.tight_layout()
+    plt.savefig(folder + '\\nodeLoads.svg', format='svg')
+
+def nodeLoads2(df, folder):
+    df = df.groupby(['source','node','iteration'], as_index=False).agg(
+    {
+     'millicores': 'sum',
+     'source': 'first',
+     }
+    )
+    
+    fig = plt.figure(figsize=(9.6,6))
+    ax = plt.axes()
+    ax.set(xlabel='Average Load (Millicores)', xlim=[0,4000])
+    fig.add_axes(ax)
+    g = sns.swarmplot(x="millicores", y="node", hue="source", ax=ax,
+                data=df)
+    g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    g.grid(True,axis='x')
 
     plt.tight_layout()
     plt.savefig(folder + '\\nodeLoads.svg', format='svg')
@@ -89,19 +111,26 @@ def genDf(folder):
     
     return res
 
-
-# if (len(sys.argv) >= 2):
-#     folder = sys.argv[1]
-# else:
-#     raise Exception('Specify an input folder')
-mpl.use('WebAgg')
-   
-folder = '..\\md\\mixed_wf\\50-wf1-200-wf2'
+def run(folder):
+    mpl.use('WebAgg')
+        
+    df = genDf(folder)
     
-df = genDf(folder)
+    nodeLoads2(df, folder)
+    servicesConsumption(df, folder)
 
-servicesConsumption(df, folder)
-nodeLoads(df, folder)
+if __name__ == '__main__':
+    if (len(sys.argv) >= 2):
+        folder = sys.argv[1]
+    else:
+        raise Exception('Specify an input folder')
+    mpl.use('WebAgg')
+        
+    df = genDf(folder)
+    
+    nodeLoads2(df, folder)
+    servicesConsumption(df, folder)
+
 
 
 

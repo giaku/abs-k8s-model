@@ -93,25 +93,25 @@ import * from ABS.DC;
   ServiceEndpoint rediscartEP = await rediscart!getServiceEndpoint();
   ServiceEndpoint adserviceEP = await adservice!getServiceEndpoint();
 
-  // WF1 50RPS
-  Int batchSize1 = 50;
-  Request request15 = Request("request_5", 166, 1, batchSize1);    // adservice
-  Request request13 = Request("request_3", 135, 1, batchSize1);    // cartservice
-  Request request12 = Request("request_2", 743, 1, batchSize1);   // currencyservice
-  Request request11 = Request("request_1", 910, 1, batchSize1);   // frontend
-  Request request14 = Request("request_4", 88, 1, batchSize1);    // productcatalog
-  Request request16 = Request("request_6", 37, 1, batchSize1);    // recommendationservice
-  Request request17 = Request("request_6", 37, 1, batchSize1);    // rediscart
+  // WF1 200RPS
+  Int batchSize1 = 200;
+  Request request15 = Request("request_5", 299, 1, batchSize1);    // adservice
+  Request request13 = Request("request_3", 385, 1, batchSize1);    // cartservice
+  Request request12 = Request("request_2", 2144, 1, batchSize1);   // currencyservice
+  Request request11 = Request("request_1", 3001, 1, batchSize1);   // frontend
+  Request request14 = Request("request_4", 245, 1, batchSize1);    // productcatalog
+  Request request16 = Request("request_6", 40, 1, batchSize1);    // recommendationservice
+  Request request17 = Request("request_6", 70, 1, batchSize1);    // rediscart
 
-  // WF2 200RPS
-  Int batchSize3 = 200;
-  Request request35 = Request("request_5", 300 - 110, 1, batchSize3);    // adservice
-  Request request33 = Request("request_3", 369 - 29, 1, batchSize3);    // cartservice
-  Request request32 = Request("request_2", 2157 - 49, 1, batchSize3);   // currencyservice
-  Request request31 = Request("request_1", 3139 - 44, 1, batchSize3);   // frontend
-  Request request34 = Request("request_4", 244 - 28, 1, batchSize3);    // productcatalog
-  Request request36 = Request("request_7", 40 - 40, 1, batchSize3);    // recommendationservice
-  Request request37 = Request("request_6", 67 - 19, 1, batchSize3);    // rediscart
+  // WF2 50RPS
+  Int batchSize3 = 50;
+  Request request35 = Request("request_5", 165 - 110, 1, batchSize3);    // adservice
+  Request request33 = Request("request_3", 135 - 29, 1, batchSize3);    // cartservice
+  Request request32 = Request("request_2", 750 - 49, 1, batchSize3);   // currencyservice
+  Request request31 = Request("request_1", 986 - 44, 1, batchSize3);   // frontend
+  Request request34 = Request("request_4", 91 - 28, 1, batchSize3);    // productcatalog
+  Request request36 = Request("request_7", 46 - 40, 1, batchSize3);    // recommendationservice
+  Request request37 = Request("request_6", 36 - 19, 1, batchSize3);    // rediscart
 
 
   ServiceTask frontendTask1 = new ServiceRequest(frontendEP,request11);
