@@ -19,7 +19,7 @@ def readAndFormatCsvs(folder):
 
 def printToTxt(dataframe, folder = '', name = 'calibrationAvg.txt'):
     file = open(folder + '\\' + name,'w+')
-    file.write(str(dataframe))
+    file.write(str(dataframe) + '\n')
     file.close()
 
 

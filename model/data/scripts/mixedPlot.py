@@ -11,6 +11,7 @@ import df_manip as dfm
 import output_p as outp
 import csv_reader as csvr
 import seaborn as sns
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 
 
@@ -68,7 +69,7 @@ def nodeLoads(df, folder):
     )
     
     g = sns.catplot(x="millicores", y="node", hue="source", kind="swarm",
-                data=df, height=6, aspect=1.6)
+                data=df, height=6, aspect=1.6, legend = False)
     g.set(xlabel='Average Load (Millicores)', xlim=[0,4000])
     g.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
@@ -80,7 +81,7 @@ def genDf(folder):
     model = outp.PodReport.prListToDf(outp.podReports(folder + '\\model.txt'))
     model['iteration'] = -1
 
-    test = readAndFormatCsvs(folder + '\\csvs')
+    test = readAndFormatCsvs(folder)
     
     res = dfm.mergeModel(test, model)
     res = dfm.mapNodes(res)
@@ -93,8 +94,9 @@ def genDf(folder):
 #     folder = sys.argv[1]
 # else:
 #     raise Exception('Specify an input folder')
+mpl.use('WebAgg')
    
-folder = '..\\md\\mixed_wf\\wf1-100_wf3-200'
+folder = '..\\md\\mixed_wf\\50-wf1-200-wf2'
     
 df = genDf(folder)
 

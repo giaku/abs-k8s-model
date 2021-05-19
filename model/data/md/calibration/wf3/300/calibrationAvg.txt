@@ -1,0 +1,8 @@
+                 service        value
+0              adservice   424.777778
+1            cartservice   515.305556
+2        currencyservice   818.305556
+3               frontend  3739.166667
+4  productcatalogservice  1567.500000
+5  recommendationservice  1009.166667
+6             redis-cart    91.002778
