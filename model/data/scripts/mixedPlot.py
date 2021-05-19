@@ -60,6 +60,24 @@ def servicesConsumption(df, folder):
     plt.tight_layout()
     plt.savefig(folder + '\\serviceLoads.svg', format='svg')
 
+def servicesConsumption2(df, folder):
+    df = df.groupby(['service','source','iteration'], as_index=False).agg(
+    {
+      'millicores': 'sum',
+      }
+    )
+    
+    fig = plt.figure(figsize=(9.6,6))
+    ax = plt.axes()
+    fig.add_axes(ax)
+    g = sns.swarmplot(x="millicores", y="service", hue="source", ax=ax,
+                data=df)
+    g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    g.grid(True,axis='x')
+    g.set(xlabel='Average Load (Millicores)', ylabel='Service')
+
+    plt.tight_layout()
+    plt.savefig(folder + '\\serviceLoads.svg', format='svg')
 
 def nodeLoads(df, folder):
     df = df.groupby(['source','node','iteration'], as_index=False).agg(
@@ -88,12 +106,13 @@ def nodeLoads2(df, folder):
     
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
-    ax.set(xlabel='Average Load (Millicores)', xlim=[0,4000])
+    ax.set(xlim=[0,4000])
     fig.add_axes(ax)
     g = sns.swarmplot(x="millicores", y="node", hue="source", ax=ax,
                 data=df)
     g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     g.grid(True,axis='x')
+    g.set(xlabel='Average Load (Millicores)', ylabel='Node')
 
     plt.tight_layout()
     plt.savefig(folder + '\\nodeLoads.svg', format='svg')
@@ -117,7 +136,7 @@ def run(folder):
     df = genDf(folder)
     
     nodeLoads2(df, folder)
-    servicesConsumption(df, folder)
+    servicesConsumption2(df, folder)
 
 if __name__ == '__main__':
     if (len(sys.argv) >= 2):
@@ -129,7 +148,7 @@ if __name__ == '__main__':
     df = genDf(folder)
     
     nodeLoads2(df, folder)
-    servicesConsumption(df, folder)
+    servicesConsumption2(df, folder)
 
 
 
