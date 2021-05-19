@@ -17,9 +17,9 @@ def readAndFormatCsvs(folder):
     return df
 
 
-def printToTxt(dataframe, folder = '', name = 'calibrationAvg'):
+def printToTxt(dataframe, folder = '', name = 'calibrationAvg.txt'):
     file = open(folder + '\\' + name,'w+')
-    file.write(dataframe)
+    file.write(str(dataframe))
     file.close()
 
 
@@ -90,22 +90,28 @@ def filterMdCfg1(dataf):
     
     return dataf
 
+def run(folder):
+    df = readAndFormatCsvs(folder)
+    df = avgPodsConsByIteration(df)
+    df = filterMdCfg1(df)
+    printToTxt(totalServiceCons(df),folder)
 
-# if (len(sys.argv) >= 2):
-#     folder = sys.argv[1]
-# else:
-#     raise Exception('Specify an input folder')
-
-folder = '..\\md\\calibration\\wf3\\200'
-
-df = readAndFormatCsvs(folder)
-df = avgPodsConsByIteration(df)
-df = filterMdCfg1(df)
-
-
-print(len(set(df['iteration'])),end='\n\n')
-print(totalServiceByIteration(df).sort_values(by=['iteration','service']),end='\n\n')
-print(totalServiceCons(df))
+if __name__ == '__main__':
+    # if (len(sys.argv) >= 2):
+    #     folder = sys.argv[1]
+    # else:
+    #     raise Exception('Specify an input folder')
+    
+    folder = '..\\md\\calibration\\wf3\\200'
+    
+    df = readAndFormatCsvs(folder)
+    df = avgPodsConsByIteration(df)
+    df = filterMdCfg1(df)
+    
+    
+    print(len(set(df['iteration'])),end='\n\n')
+    print(totalServiceByIteration(df).sort_values(by=['iteration','service']),end='\n\n')
+    print(totalServiceCons(df))
 
 
 

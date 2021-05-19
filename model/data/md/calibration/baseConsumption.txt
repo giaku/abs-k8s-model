@@ -1,0 +1,8 @@
+                 service value
+0              adservice   110
+1            cartservice    29
+2        currencyservice    49
+3               frontend    44
+4  productcatalogservice    28
+5  recommendationservice    49
+6             redis-cart    19
