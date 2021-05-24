@@ -1,0 +1,173 @@
+module MicroservicesDemoTest1;
+
+import * from K8sService;
+import * from K8sMaster;
+import * from K8sUtil;
+import * from K8sWorkflow;
+import * from K8sClients;
+import * from ABS.DC;
+
+{
+  Int timeUnitSize = 2;
+  Int costGranularity = 100;
+
+  CloudProvider cp = new CloudProvider("Cloud");
+  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity);
+  Bool fb = master.createNodes(4,4000,4000,0);
+
+  ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig checkoutservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig recommendationservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig frontendPodConfig = PodConfig(1, 0, 450, 3000, costGranularity);
+  ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig paymentservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
+  ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig productcatalogservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig cartservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
+  ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig currencyservicePodConfig = PodConfig(1, 0, 450, 500, costGranularity);
+  ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig shippingservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
+  ServiceConfig rediscartServiceConfig = ServiceConfig("redis-cart", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig rediscartPodConfig = PodConfig(1, 0, 220, 325, costGranularity);
+  ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig adservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
+
+  Map<String,List<Int>> rulesMap = map[];
+  rulesMap = put(rulesMap,"frontend",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"currencyservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"adservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"cartservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"productcatalogservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"rediscart",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"recommendationservice",list[1,2,3,4]);
+
+  master.setSchedulerRulesMap(rulesMap);
+
+  ServiceLoadBalancerPolicy policy = new RoundRobinLbPolicy();
+
+  Service emailservice = new ServiceObject(emailserviceServiceConfig, emailservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service checkoutservice = new ServiceObject(checkoutserviceServiceConfig, checkoutservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service recommendationservice = new ServiceObject(recommendationserviceServiceConfig, recommendationservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service frontend = new ServiceObject(frontendServiceConfig, frontendPodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service paymentservice = new ServiceObject(paymentserviceServiceConfig, paymentservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service productcatalogservice = new ServiceObject(productcatalogserviceServiceConfig, productcatalogservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service cartservice = new ServiceObject(cartserviceServiceConfig, cartservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service currencyservice = new ServiceObject(currencyserviceServiceConfig, currencyservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service shippingservice = new ServiceObject(shippingserviceServiceConfig, shippingservicePodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service rediscart = new ServiceObject(rediscartServiceConfig, rediscartPodConfig, policy);
+  policy = new RoundRobinLbPolicy();
+  Service adservice = new ServiceObject(adserviceServiceConfig, adservicePodConfig, policy);
+
+  List<Service> services = list[emailservice,checkoutservice,recommendationservice,frontend,paymentservice,
+                                productcatalogservice,cartservice,currencyservice,shippingservice,rediscart,
+                                adservice];
+
+  foreach (s in services){
+    master.deployService(s);
+  }
+
+  ServiceEndpoint emailserviceEP = await emailservice!getServiceEndpoint();
+  ServiceEndpoint checkoutserviceEP = await checkoutservice!getServiceEndpoint();
+  ServiceEndpoint recommendationserviceEP = await recommendationservice!getServiceEndpoint();
+  ServiceEndpoint frontendEP = await frontend!getServiceEndpoint();
+  ServiceEndpoint paymentserviceEP = await paymentservice!getServiceEndpoint();
+  ServiceEndpoint productcatalogserviceEP = await productcatalogservice!getServiceEndpoint();
+  ServiceEndpoint cartserviceEP = await cartservice!getServiceEndpoint();
+  ServiceEndpoint currencyserviceEP = await currencyservice!getServiceEndpoint();
+  ServiceEndpoint shippingserviceEP = await shippingservice!getServiceEndpoint();
+  ServiceEndpoint rediscartEP = await rediscart!getServiceEndpoint();
+  ServiceEndpoint adserviceEP = await adservice!getServiceEndpoint();
+
+  // WF1 30RPS
+  Int batchSize1 = 30;
+  Request request15 = Request("request_5", 146, 1, batchSize1);    // adservice
+  Request request13 = Request("request_3", 96, 1, batchSize1);    // cartservice
+  Request request12 = Request("request_2", 493, 1, batchSize1);   // currencyservice
+  Request request11 = Request("request_1", 576, 1, batchSize1);   // frontend
+  Request request14 = Request("request_4", 64, 1, batchSize1);    // productcatalog
+  Request request16 = Request("request_6", 39, 1, batchSize1);    // recommendationservice
+  Request request17 = Request("request_6", 31, 1, batchSize1);    // rediscart
+
+  // WF2 70RPS
+  Int batchSize2 = 70;
+  Request request25 = Request("request_5", 188 - 110, 1, batchSize2);    // adservice
+  Request request23 = Request("request_3", 179 - 29, 1, batchSize2);    // cartservice
+  Request request22 = Request("request_2", 988 - 49, 1, batchSize2);   // currencyservice
+  Request request21 = Request("request_1", 1324 - 44, 1, batchSize2);   // frontend
+  Request request24 = Request("request_4", 115 - 28, 1, batchSize2);    // productcatalog
+  Request request26 = Request("request_7", 45 - 40, 1, batchSize2);    // recommendationservice
+  Request request27 = Request("request_6", 41 - 19, 1, batchSize2);    // rediscart
+
+  // WF3 200RPS
+  Int batchSize3 = 200;
+  Request request35 = Request("request_5", 315 - 110, 1, batchSize3);    // adservice
+  Request request33 = Request("request_3", 374 - 29, 1, batchSize3);    // cartservice
+  Request request32 = Request("request_2", 557 - 49, 1, batchSize3);   // currencyservice
+  Request request31 = Request("request_1", 2638 - 44, 1, batchSize3);   // frontend
+  Request request34 = Request("request_4", 1142 - 28, 1, batchSize3);    // productcatalog
+  Request request36 = Request("request_7", 698 - 40, 1, batchSize3);    // recommendationservice
+  Request request37 = Request("request_6", 70 - 19, 1, batchSize3);    // rediscart
+
+
+  ServiceTask frontendTask1 = new ServiceRequest(frontendEP,request11);
+  ServiceTask currencyTask1 = new ServiceRequest(currencyserviceEP,request12);
+  ServiceTask cartTask1 = new ServiceRequest(cartserviceEP,request13);
+  ServiceTask productcatalogTask1 = new ServiceRequest(productcatalogserviceEP,request14);
+  ServiceTask adTask1 = new ServiceRequest(adserviceEP,request15);
+  ServiceTask recommendationTask1 = new ServiceRequest(recommendationserviceEP,request16);
+  ServiceTask rediscartTask1 = new ServiceRequest(rediscartEP,request17);
+
+  ServiceTask workflow1 = new ServiceWorkflow(Cons(list[frontendTask1,currencyTask1,cartTask1,productcatalogTask1,adTask1,recommendationTask1,rediscartTask1],Nil));
+
+  ServiceTask frontendTask2 = new ServiceRequest(frontendEP,request21);
+  ServiceTask currencyTask2 = new ServiceRequest(currencyserviceEP,request22);
+  ServiceTask cartTask2 = new ServiceRequest(cartserviceEP,request23);
+  ServiceTask productcatalogTask2 = new ServiceRequest(productcatalogserviceEP,request24);
+  ServiceTask adTask2 = new ServiceRequest(adserviceEP,request25);
+  ServiceTask recommendationTask2 = new ServiceRequest(recommendationserviceEP,request26);
+  ServiceTask rediscartTask2 = new ServiceRequest(rediscartEP,request27);
+
+  ServiceTask workflow2 = new ServiceWorkflow(Cons(list[frontendTask2,currencyTask2,cartTask2,productcatalogTask2,adTask2,recommendationTask2,rediscartTask2],Nil));
+
+  ServiceTask frontendTask3 = new ServiceRequest(frontendEP,request31);
+  ServiceTask currencyTask3 = new ServiceRequest(currencyserviceEP,request32);
+  ServiceTask cartTask3 = new ServiceRequest(cartserviceEP,request33);
+  ServiceTask productcatalogTask3 = new ServiceRequest(productcatalogserviceEP,request34);
+  ServiceTask adTask3 = new ServiceRequest(adserviceEP,request35);
+  ServiceTask recommendationTask3 = new ServiceRequest(recommendationserviceEP,request36);
+  ServiceTask rediscartTask3 = new ServiceRequest(rediscartEP,request37);
+
+  ServiceTask workflow3 = new ServiceWorkflow(Cons(list[frontendTask3,currencyTask3,cartTask3,productcatalogTask3,adTask3,recommendationTask3,rediscartTask3],Nil));
+  //ServiceTask workflow2 = new ServiceWorkflow(list[list[adTask],list[workflow1]]);
+
+  Printer printer = new PrinterObject2();
+  List<Service> sList = list[frontend,currencyservice,cartservice,productcatalogservice,adservice,recommendationservice,rediscart];
+
+  printer!printStatus(master,sList,110,1);
+
+  await duration(5,5);
+
+  //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
+  Client c1 = new ClientObject(workflow1,90,rat(1.0));
+  Client c2 = new ClientObject(workflow2,90,rat(1.0));
+  Client c3 = new ClientObject(workflow3,90,rat(1.0));
+  c3!start();
+  c2!start();
+  c1!start();
+
+}

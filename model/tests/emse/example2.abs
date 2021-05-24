@@ -1,0 +1,84 @@
+module MicroservicesDemoTest1;
+
+import * from K8sService;
+import * from K8sMaster;
+import * from K8sUtil;
+import * from K8sWorkflow;
+import * from K8sClients;
+import * from ABS.DC;
+
+{
+  // Int timeUnitSize = 2;
+  Int costGranularity = 100; // steps to compute a request
+
+  // CLUSTER CREATION
+  CloudProvider cp = new CloudProvider("Cloud");
+  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity); // cycles duration parameters
+  // master.createNodes(number, cpuCapacity, memoryCapacity, cpuSystemLoad);
+  Bool fb = master.createNodes(4,4000,4000,0); // number, cpu capacity, memory capacity, system load
+
+  // SERVICE CONFIGURATIONS CREATION
+  // ServiceConfig serviceConfig = ServiceConfig(serviceName, startingPods, minPods, maxPods, scalerCycle, upscaleThreshold, downscaleThreshold, downscalePeriod);
+  // PodConfig podConfig = PodConfig(monitorCycle, memoryCooldown, cpuRequest, cpuLimit, costGranularity);
+  ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+
+  // SETTING A FIXED SCHEDULING
+  // rulesMap = put(rulesMap, serviceName, nodePattern);
+  Map<String,List<Int>> rulesMap = map[];
+  rulesMap = put(rulesMap,"emailservice",list[1,2,3,4]);
+
+  // SERVICE CREATION
+  // ServiceLoadBalancerPolicy policy = new Policy();
+  // Service service = new ServiceObject(serviceConfig, podConfig, policy);
+  ServiceLoadBalancerPolicy policy = new RoundRobinLbPolicy();
+  Service emailservice = new ServiceObject(emailserviceServiceConfig, emailservicePodConfig, policy);
+
+  // DEPLOY SERVICES
+  // List<Service> services = list[service1,...,serviceN]
+  // foreach (s in services){ master.deployService(s); }
+  List<Service> services = list[emailservice,checkoutservice,recommendationservice,frontend,paymentservice,
+                                productcatalogservice,cartservice,currencyservice,shippingservice,rediscart,
+                                adservice];
+  foreach (s in services){
+    master.deployService(s);
+  }
+
+  // RETRIEVE SERVICE ENDPOINT
+  // ServiceEndpoint serviceEP = await service!getServiceEndpoint();
+  ServiceEndpoint emailserviceEP = await emailservice!getServiceEndpoint();
+
+  // CREATE A WORKFLOW
+
+  // REQUESTS
+  // Request request = Request(name, cpuCost, memoryCost, batchSize);
+  Int batchSize1 = 50;
+  Request request11 = Request("request_1", 910, 1, batchSize1);
+
+  // SERVICETASK
+  // ServiceTask serviceTask = new ServiceRequest(serviceEP,request);
+  ServiceTask emailserviceTask1 = new ServiceRequest(emailserviceEP,request11);
+
+  // CREATE PARALLEL WORKFLOW
+  // ServiceTask workflow = new ServiceWorkflow(Cons(list[serviceTask1,...,serviceTaskN],Nil));
+  ServiceTask workflow1 = new ServiceWorkflow(Cons(list[emailserviceTask1,frontendTask1,currencyTask1,cartTask1,productcatalogTask1,adTask1,recommendationTask1,rediscartTask1],Nil));
+
+  // SET UP OUTPUT PRINTER
+  // CREATE
+  Printer printer = new PrinterObject2();
+  // LIST OF SERVICES TO PRINT
+  List<Service> sList = list[emailservice,frontend,currencyservice,cartservice,productcatalogservice,adservice,recommendationservice,rediscart];
+  // START PRINTING
+  // printer!printStatus(Master m, List<Service> sList, Int times, Rat interval);
+  printer!printStatus(master,sList,110,1);
+
+  await duration(5,5);
+
+  // CREATE AND START CLIENTS
+  //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
+  Client c1 = new ClientObject(workflow1,90,rat(1.0));
+  Client c2 = new ClientObject(workflow3,90,rat(1.0));
+  c2!start();
+  c1!start();
+
+}
