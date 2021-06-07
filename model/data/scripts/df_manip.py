@@ -198,6 +198,16 @@ def mapNodeName(node):
         return 'Worker-3'
     elif '4' in node:
         return 'Worker-4'
+    elif '5' in node:
+        return 'Worker-5'
+    elif '6' in node:
+        return 'Worker-6'
+    elif '7' in node:
+        return 'Worker-7'
+    elif '8' in node:
+        return 'Worker-8'
+    elif '9' in node:
+        return 'Worker-9'
     else:
         return 'Worker'
 

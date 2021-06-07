@@ -9,17 +9,21 @@ import mixedPlot as mxp
 import sys
 import traceback
 
-def runAll():
-    paths = ['..\\md\\mixed_wf_2nd_scheduling']
+def runAll(paths):
+    executed = ''
     for path in paths:
         for fld in os.listdir(path):
             try:
-                mxp.run_NoMod(path + '\\' + fld)
+                pth = path + '\\' + fld
+                mxp.run_noMod(pth)
+                executed = executed + pth + '\n'
             except:
-                print('error running on: '  + path + '\\' + fld)
+                print('error running on: '  + pth)
+                traceback.print_exc()
                 
-def runNew():
-    paths = ['..\\md\\hpc4ai_data\\slices\\2nodes-vs-3nodes2021-06-06_09_53_41\\outputs2_2node']
+    print('Executed: \n' + executed)
+                
+def runNew(paths):
     executed = ''
     for path in paths:
         for fld in os.listdir(path):
@@ -42,10 +46,12 @@ def runNew():
     
     print('Executed: \n' + executed)
 
-if len(sys.argv) > 1:
-    if sys.argv[1] == '-all' and len(sys.argv) == 2:
-        runAll()
+if len(sys.argv) > 2:
+    if sys.argv[1] == '-all' and len(sys.argv) == 3:
+        runAll([sys.argv[2]])
     else:
         raise Exception('invalid arguments')
+elif len(sys.argv) == 2:
+    runNew([sys.argv[1]])
 else:
-    runNew()
+    raise Exception('Specify a folder path')
