@@ -45,17 +45,20 @@ def podAvgConsumptions(df):
 
 
 def servicesConsumption(df, folder):
-    df = df.groupby(['service','source','iteration'], as_index=False).agg(
+    df = df.groupby(['service','iteration'], as_index=False).agg(
     {
       'millicores': 'sum',
       }
     )
     
-    g = sns.catplot(x="millicores", y="service", hue="source", kind="swarm",
-                data=df, height=6, aspect=1.6, legend = False)
-    g.set(xlabel='Average Load (Millicores)')
-    g.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='source')
-    g.ax.grid(True,axis='x')
+    fig = plt.figure(figsize=(9.6,6))
+    ax = plt.axes()
+    fig.add_axes(ax)
+    g = sns.swarmplot(x="millicores", y="service", ax=ax,
+                data=df)
+    g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    g.grid(True,axis='x')
+    g.set(xlabel='Average Load (Millicores)', ylabel='Service')
 
     plt.tight_layout()
     plt.savefig(folder + '\\serviceLoads.svg', format='svg')
@@ -80,18 +83,22 @@ def servicesConsumption2(df, folder):
     plt.savefig(folder + '\\serviceLoads.svg', format='svg')
 
 def nodeLoads(df, folder):
-    df = df.groupby(['source','node','iteration'], as_index=False).agg(
+    df = df.groupby(['node','iteration'], as_index=False).agg(
     {
      'millicores': 'sum',
      'source': 'first',
      }
     )
     
-    g = sns.catplot(x="millicores", y="node", hue="source", kind="swarm",
-                data=df, height=6, aspect=1.6, legend = False)
-    g = (g.set(xlabel='Average Load (Millicores)', xlim=[0,4000]))
-    g.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    g.ax.grid(True,axis='x')
+    fig = plt.figure(figsize=(9.6,6))
+    ax = plt.axes()
+    ax.set(xlim=[0,4000])
+    fig.add_axes(ax)
+    g = sns.swarmplot(x="millicores", y="node", ax=ax,
+                data=df)
+    g.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    g.grid(True,axis='x')
+    g.set(xlabel='Average Load (Millicores)', ylabel='Node')
 
     plt.tight_layout()
     plt.savefig(folder + '\\nodeLoads.svg', format='svg')
@@ -130,6 +137,15 @@ def genDf(folder):
     
     return res
 
+def genDfNoModel(folder):
+    test = readAndFormatCsvs(folder)
+    
+    res = dfm.mergeDfs(None, test)
+    res = dfm.mapNodes(res)
+    res = podAvgConsumptions(res)
+    
+    return res
+
 def run(folder):
     mpl.use('WebAgg')
         
@@ -137,6 +153,14 @@ def run(folder):
     
     nodeLoads2(df, folder)
     servicesConsumption2(df, folder)
+    
+def run_noMod(folder):
+    mpl.use('WebAgg')
+        
+    df = genDfNoModel(folder)
+    
+    nodeLoads(df, folder)
+    servicesConsumption(df, folder)
 
 if __name__ == '__main__':
     if (len(sys.argv) >= 2):

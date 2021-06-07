@@ -170,6 +170,20 @@ def mergeModel(test,model):
     result = result.rename(columns={'level_0':'source','value':'millicores'})
     
     return result
+
+def mergeDfs(df,new):
+    new['value'] = new['value'].apply(lambda x:x*1000)
+    new['source'] = 'test'
+    new = new.rename(columns={'value':'millicores'})
+    
+    if df != None:
+        result = p.concat([df,new], keys=['test','model']).reset_index()
+    
+        result = result.drop(columns=['level_1','level_0'])
+    else:
+        result = new
+    
+    return result
     
 def mapNodes(df):
     df['node'] = df['node'].apply(mapNodeName)
