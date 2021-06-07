@@ -9,7 +9,7 @@ import mixedPlot as mxp
 import sys
 
 def runAll():
-    paths = ['..\\md\\mixed_wf']
+    paths = ['..\\md\\mixed_wf_2nd_scheduling']
     for path in paths:
         for fld in os.listdir(path):
             try:
@@ -18,7 +18,7 @@ def runAll():
                 print('error running on: '  + path + '\\' + fld)
                 
 def runNew():
-    paths = ['..\\md\\mixed_wf']
+    paths = ['..\\md\\mixed_wf_2nd_scheduling']
     executed = ''
     for path in paths:
         for fld in os.listdir(path):
