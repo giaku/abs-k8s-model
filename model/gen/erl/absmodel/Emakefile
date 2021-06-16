@@ -1,0 +1,21 @@
+{
+  %% files
+  [
+   "src/gc.erl",
+   "src/task.erl",
+   "src/object.erl",
+   "src/*"
+  ],
+  %% options
+  [
+   { i, "./include" },
+   { i, "./ebin" },
+   { source,"./ebin"},
+   { outdir, "./ebin" },
+   debug_info,
+   nowarn_unused_vars,
+   nowarn_unused_function,
+   nowarn_shadow_vars,
+   nowarn_export_all
+  ]
+}.

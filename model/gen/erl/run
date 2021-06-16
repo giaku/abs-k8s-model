@@ -1,0 +1,24 @@
+#!/bin/bash
+
+scriptpath="$( cd "$(dirname "$0")" ; pwd -P )"
+codepaths=$(find "$scriptpath" -name "ebin" -type d -print0 \
+                 | xargs -0 printf '%s","' | sed 's/","$//g')
+
+tmpfile=$(mktemp)
+
+(
+    echo "#!/usr/bin/env escript"
+    echo "% use this to increase process limit: %%! +P 134217727"
+    echo "main(Arg)->"
+    echo "code:add_paths([\"$codepaths\"]),"
+    echo "runtime:run(Arg)."
+) > $tmpfile
+
+cleanup () {
+    rm $tmpfile &> /dev/null
+    return $exit_code
+}
+
+trap cleanup EXIT
+escript $tmpfile $@
+exit_code=$?

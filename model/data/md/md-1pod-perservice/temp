@@ -1,0 +1,73 @@
+for xxxx in `find . -mindepth 1 -maxdepth 1`
+do
+if [ -d "$xxxx" ]
+then
+
+newx=`echo "$xxxx" | sed 's/:/_/g'`
+echo
+mv $xxxx $newx
+xxxx=$newx
+
+for xxx in `find $xxxx -mindepth 1 -maxdepth 1`
+do
+if [ -d "$xxx" ]
+then
+
+newx=`echo "$xxx" | sed 's/:/_/g'`
+echo
+mv $xxx $newx
+xxx=$newx
+
+for xx in `find $xxx -mindepth 1 -maxdepth 1`
+do
+  #echo $xx
+  if [ -d "$xx" ]
+  then
+    newx=`echo "$xx" | sed 's/:/_/g'`
+    echo
+    mv $xx $newx
+    xx=$newx
+    for x in `find $xx -mindepth 1 -maxdepth 1`
+    do
+      if [ -d "$x" ]
+      then
+        echo "Dir $x remains to be checked"
+        newx=`echo "$x" | sed 's/:/_/g'`
+        echo
+        mv $x $newx
+        x=$newx
+      else
+        echo "File $x needs to be renamed"
+        echo
+        echo "renamed from: $x"
+        newx=`echo "$x" | sed 's/:/_/g'`
+        echo
+        mv $x $newx
+        echo "to $newx"
+        echo
+      fi
+    done
+  else
+    echo "Dir $xx remains to be checked"
+        newx=`echo "$xx" | sed 's/:/_/g'`
+        echo
+        mv $xx $newx
+  fi
+done
+else
+echo "Dir $xxx remains to be checked"
+        newx=`echo "$xxx" | sed 's/:/_/g'`
+        echo
+        mv $xxx $newx
+fi
+done
+else 
+echo "Dir $xxxx remains to be checked"
+        newx=`echo "$xxxx" | sed 's/:/_/g'`
+        echo
+        mv $xxxx $newx
+fi
+done
+
+
+
