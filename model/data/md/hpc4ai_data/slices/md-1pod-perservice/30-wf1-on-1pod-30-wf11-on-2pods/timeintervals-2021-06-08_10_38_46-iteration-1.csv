@@ -1,0 +1,13 @@
+"Time","pod:adservice-w6-855c98bf6b-dsrwm_service:adservice_node:worker6.novalocal","pod:cartservice-w6-6d4d6c4c5c-h86sv_service:cartservice_node:worker6.novalocal","pod:currencyservice-w6-5b776bf55-fdjgt_service:currencyservice_node:worker6.novalocal","pod:currencyservice-w6-5b776bf55-v4cg4_service:currencyservice_node:worker6.novalocal","pod:frontend-w6-848ff7549d-9nll7_service:frontend_node:worker6.novalocal","pod:productcatalogservice-w6-67544f6596-cbqhb_service:productcatalogservice_node:worker6.novalocal","pod:recommendationservice-w6-6c8dc9f77d-k9zvm_service:recommendationservice_node:worker6.novalocal","pod:redis-cart-w6-cc974966d-xmhl8_service:redis-cart_node:worker6.novalocal"
+2021-06-08 10:39:00,0.0804,0.0938,,0.386,0.618,0.0610,0.0124,0.0154
+2021-06-08 10:39:30,0.0805,0.101,,0.451,0.664,0.0596,0.0113,0.0165
+2021-06-08 10:40:00,0.0804,0.106,,0.446,0.691,0.0600,0.0113,0.0153
+2021-06-08 10:40:30,0.0811,0.101,,0.464,0.695,0.0631,0.0107,0.0153
+2021-06-08 10:41:00,0.0785,0.0982,,0.449,0.674,0.0626,0.0118,0.0154
+2021-06-08 10:41:30,0.0763,0.0959,,0.461,0.683,0.0601,0.0108,0.0159
+2021-06-08 10:42:00,0.0797,0.0974,,0.429,0.689,0.0593,0.0118,0.0165
+2021-06-08 10:42:30,0.0838,0.0993,,0.414,0.687,0.0592,0.0120,0.0154
+2021-06-08 10:43:00,0.0839,0.106,,0.424,0.642,0.0601,0.0109,0.0153
+2021-06-08 10:43:30,0.0815,0.106,,0.430,0.657,0.0623,0.0101,0.0152
+2021-06-08 10:44:00,0.0786,0.103,,0.431,0.713,0.0623,0.0111,0.0166
+2021-06-08 10:44:30,0.0785,0.103,,0.427,0.687,0.0625,0.0118,0.0158

@@ -8,8 +8,8 @@ import os
 import mixedPlot as mxp
 import sys
 
-def runAll():
-    paths = ['..\\md\\mixed_wf_2nd_scheduling']
+def runAll(paths):
+    # paths = ['..\\md\\mixed_wf_2nd_scheduling']
     for path in paths:
         for fld in os.listdir(path):
             try:
@@ -17,8 +17,8 @@ def runAll():
             except:
                 print('error running on: '  + path + '\\' + fld)
                 
-def runNew():
-    paths = ['..\\md\\mixed_wf_2nd_scheduling']
+def runNew(paths):
+    # paths = ['..\\md\\mixed_wf_2nd_scheduling']
     executed = ''
     for path in paths:
         for fld in os.listdir(path):
@@ -40,12 +40,14 @@ def runNew():
     
     print('Executed: \n' + executed)
 
-if len(sys.argv) > 1:
-    if sys.argv[1] == '-all' and len(sys.argv) == 2:
-        runAll()
+if len(sys.argv) > 2:
+    if sys.argv[1] == '-all' and len(sys.argv) == 3:
+        runAll([sys.argv[2]])
     else:
         raise Exception('invalid arguments')
+elif len(sys.argv) == 2:
+    runNew([sys.argv[1]])
 else:
-    runNew()
+    raise Exception('Specify a folder path')
     
 
