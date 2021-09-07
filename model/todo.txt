@@ -1,0 +1,4 @@
+- NODE INPUT: rps instead of millicores
+- LOAD BALANCING: rps balancing between nodes
+- FOR EVERY NODE TYPE: table to convert rps,wf,service -> millicores
+- MIXED WORKFLOWS: weighted average between workflows

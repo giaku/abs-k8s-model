@@ -10,6 +10,10 @@ import * from K8sUtil;
 import * from K8sUtil;
 import * from ABS.Scheduler;*/
 
+data WorkflowData = WorkflowData(String wf_name, List<String> services);
+
+data ClientRequest = ClientRequest(WorkflowData wf, Int rps);
+
 interface ServiceTask{
   Unit execute();
 }
