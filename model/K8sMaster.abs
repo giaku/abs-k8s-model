@@ -19,7 +19,7 @@ interface Master{
 
   List<Pair<String,ConsumptionMap>> getNodesMap();
 
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad);
+  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat baseSystemLoad, Map<String,Int> podsMap);
 
   Unit setSchedulerRulesMap(Map<String,List<Int>> rulesMap);
 }
@@ -77,16 +77,20 @@ interface Node{
   Rat allocateMemory(Rat amount);
   Rat releaseMemory(Rat amount);
 
-  Unit addPod(Pod p, ResourcesMonitor rm);
+  Unit addPod(Pod p, ResourcesMonitor rm, String serviceName);
   Unit removePod(Pod p, ResourcesMonitor rm);
 
   List<Pod> getPods();
 
   Rat getRequestedCpu();
   Rat getAvailableCpu();
+
+  Unit serveRequest(ClientRequest request);
 }
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
-                                                                    Rat baseSystemCpuLoad, NodeResourcesMonitor monitor, Int costGranularity) implements Node{
+                                                                    Rat baseSystemCpuLoad, NodeResourcesMonitor monitor,
+                                                                    Int costGranularity, Map<String,Int> podsMap,
+                                                                    MasterLoadbalancer mlb) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -224,22 +228,41 @@ interface Node{
     return releasedMemory;
   }
 
-  Unit addPod(Pod p, ResourcesMonitor rm){
+  Unit addPod(Pod p, ResourcesMonitor rm, String serviceName){
     Rat reqCpu = await rm!getCpuRequest();
     this.pMonitors = appendright(this.pMonitors,rm);
     this.pods = appendright(this.pods,p);
 
     this.requestedCpu = this.requestedCpu + reqCpu;
     monitor!setRequestedCpu(this.requestedCpu);
+
+    // update the podsMap
+    nPods = lookupDefault(podsMap,serviceName,-1);
+    if (nPods == -1){
+      this.podsMap = put(this.podsMap,serviceName,1);
+    } else {
+      this.podsMap = put(this.podsMap,serviceName,nPods + 1);
+    }
+    await mlb!updateNodeMap(this,this.podsMap);
   }
 
-  Unit removePod(Pod p, ResourcesMonitor rm){
+  Unit removePod(Pod p, ResourcesMonitor rm, String serviceName){
     Rat reqCpu = await rm!getCpuRequest();
     this.pMonitors = without(this.pMonitors,rm);
     this.pods = without(this.pods,p);
 
     this.requestedCpu = this.requestedCpu - reqCpu;
     monitor!setRequestedCpu(this.requestedCpu);
+
+    // update the podsMap
+    nPods = lookupDefault(podsMap,serviceName,-1);
+    if (nPods == -1 || nPods == 0){
+      println("===== ===== ERROR: REMOVING A POD FROM AN EMPTY NODE ===== =====");
+      throw Exception;
+    } else {
+      this.podsMap = put(this.podsMap,serviceName,nPods - 1);
+    }
+    await mlb!updateNodeMap(this,this.podsMap);
   }
 
   List<ResourcesMonitor> getPMonitors(){
@@ -253,6 +276,11 @@ interface Node{
   Rat getAvailableCpu(){
     return this.cpu - this.requestedCpu;
   }
+
+  Unit serveRequest(ClientRequest request){
+
+  }
+
 }
 
 //
@@ -338,7 +366,7 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
       }
 
       if (maxCpu >= requestedCpu){
-        await result!addPod(p,rm);
+        await result!addPod(p,rm,serviceName);
         this.deploying = False;
         deployed = True;
       }else{
@@ -372,9 +400,71 @@ class NodeSchedulerObject(CloudProvider cloud, Int loadPeriod, Int resourceCycle
 
 interface MasterLoadbalancer(){
   Unit balanceClientRequest(ClientRequest request);
-}
-class MasterLoadbalancerObject(){
-  Unit balanceClientRequest(ClientRequest request){
 
+  Unit addNode(Node n, Map<String,Int> podsMap);
+
+  Unit updateNodeMap(Node node, Map<String,Int> podsMap);
+}
+class MasterLoadbalancerObject() implements MasterLoadbalancer{
+  List<Node> activeNodes; // currently active nodes in the system
+  Map<Node,Map<String,Int>> activeNodesMaps; // map contating the maps that indicates how many pods of a chosen service are deployed on the node
+                                             // i.e. node1 -> [activeNodesMaps] = node1PodsMap; "service1" -> [node1PodsMap] = number of pods of service1 deployed on node1
+  Map<String,Map<Node,Int>> perServicePodsNumber; // service based map, better for balancing
+
+
+
+  Unit balanceClientRequest(ClientRequest request){
+      WorkflowData wfd = wf(request);
+      List<String> services = services(wfd);
+
+      foreach (service in services){
+
+      }
+  }
+
+  // takes a size and a podMap of a service and computes the number of request for every node, the policy is round-robin
+  // between the pods.
+  // the remaining K requests (K < Total number of pods for the service) are just given to the first K pods. (not balancing between the nodes)
+  List<Pair<Node,Int>> generateSubrequestsSizes(Int rSize, Map<Node,Int> podsMap){
+    List<Pair<Node,Int>> result = list();
+    Int totalPods = foldr(+)(values(podsMap), 0);
+
+    rPerPod = truncate(rSize / totalPods);
+    remainingSize = rSize % totalPods;
+
+    foreach (node in keys(podsMap)){
+      Int nodePods = lookup(podsMap,node);
+      Int subReqSize = rPerPod * nodePods;
+
+      if (remainingSize >= nodePods){
+        remainingSize = remainingSize - nodePods;
+        subReqSize = subReqSize + nodePods;
+      } else if (remainingSize > 0){
+        subReqSize = subReqSize + remainingSize;
+        remainingSize = 0;
+      }
+
+      result = appendright(result,pair(node,subReqSize));
+    }
+
+    return result;
+  }
+
+  Unit updateNodeMap(Node node, Map<String,Int> podsMap){
+    this.activeNodesMaps = put(this.activeNodesMaps,node,podsMap);
+    this.updatePerServicePods(node,podsMap);
+  }
+
+  // updates the number of pods in the service based map
+  Unit updatePerServicePods(Node node, Map<String,Int> map){
+    List<String> services = list(keys(map));
+
+    foreach (service in services){ // for every service of the updated node:
+      podMap = lookupDefault(perServicePodsNumber,service,map()); // take the map of that service
+      podsNumber = lookup(map,service); // read the updated number of pods for that node
+      podMap = put(podMap,node,podsNumber); // udpate the node entry in the service map
+
+      perServicePodsNumber = put(perServicePodsNumber,service,podMap); // update the service entry in the perService map
+    }
   }
 }
