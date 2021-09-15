@@ -90,7 +90,7 @@ interface Node{
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
                                                                     Rat baseSystemCpuLoad, NodeResourcesMonitor monitor,
                                                                     Int costGranularity, Map<String,Int> podsMap,
-                                                                    MasterLoadbalancer mlb, Map<Service,Map<Int,Rat>> calibrationMaps) implements Node{
+                                                                    MasterLoadbalancer mlb, Map<String,Map<String,Map<Int,Rat>>> calibrationMaps) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -156,10 +156,19 @@ interface Node{
   Unit convertRps(){
     Map<String,Int> serviceConsumptions = map(); // map to store the total consumption
 
+    // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
     for (nodeReq in nodeReqsQueue){ // cycle through the node requests in the queue
-      
+
     }
 
+    // SOMMARE SU SERVIZIO MANTENENDO LE QUOTE PER WF
+
+    // LEGGERE DALLA TABELLA + MEDIA PESATA
+
+    // CREARE LE REQUEST CON IL CARICO, DIVISE GIA' PER POD
+    // mandare al pod con il processRequest
+
+    // MANDARE LE REQ AI POD
   }
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
@@ -292,7 +301,7 @@ interface Node{
   }
 
   Unit processRequest(NodeRequest request){
-
+    this.nodeReqsQueue =  appendright(this.nodeReqsQueue,request);
   }
 
 }
