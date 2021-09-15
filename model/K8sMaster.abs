@@ -85,12 +85,12 @@ interface Node{
   Rat getRequestedCpu();
   Rat getAvailableCpu();
 
-  Unit serveRequest(ClientRequest request);
+  Unit processRequest(NodeRequest request);
 }
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
                                                                     Rat baseSystemCpuLoad, NodeResourcesMonitor monitor,
                                                                     Int costGranularity, Map<String,Int> podsMap,
-                                                                    MasterLoadbalancer mlb) implements Node{
+                                                                    MasterLoadbalancer mlb, Map<Service,Map<Int,Rat>> calibrationMaps) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -106,6 +106,9 @@ interface Node{
   Rat requestedCpu = 0;
 
   Int remainingSysLoadSteps = 0;
+
+  // fixed nodes calibration features
+  List<NodeRequest> nodeReqsQueue = list[];
 
   {
     this.name = ("Node-" + toString(id));
@@ -146,6 +149,17 @@ interface Node{
     await duration(cycle,cycle);
 
     this!resetResources();
+  }
+
+  // flush the list of the node request computing the total costs for its services
+  // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
+  Unit convertRps(){
+    Map<String,Int> serviceConsumptions = map(); // map to store the total consumption
+
+    for (nodeReq in nodeReqsQueue){ // cycle through the node requests in the queue
+      
+    }
+
   }
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
@@ -277,7 +291,7 @@ interface Node{
     return this.cpu - this.requestedCpu;
   }
 
-  Unit serveRequest(ClientRequest request){
+  Unit processRequest(NodeRequest request){
 
   }
 
@@ -417,8 +431,17 @@ class MasterLoadbalancerObject() implements MasterLoadbalancer{
       WorkflowData wfd = wf(request);
       List<String> services = services(wfd);
 
-      foreach (service in services){
+      foreach (service in services){ // cycle through services of the workflow and balance the rps with a round-robin policy among the pods
+        Map<Node,Int> servicePodMap = lookup(perServicePodsNumber,service);
+        List<Pair<Node,Int>> quotas = generateSubrequestsSizes(rps(request),servicePodMap);
 
+        foreach (quota in quotas){ // generate and forward the sub-requests
+          Node node = fst(quota);
+          Int size = snd(quota);
+
+          NodeRequest nodeReq = NodeRequest(service,wfName(wfd),size); // create the node request (service,wf,rps) and sends it to the node
+          node!processRequest(nodeReq); // send the request to the node
+        }
       }
   }
 

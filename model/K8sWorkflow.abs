@@ -10,9 +10,13 @@ import * from K8sUtil;
 import * from K8sUtil;
 import * from ABS.Scheduler;*/
 
-data WorkflowData = WorkflowData(String wf_name, List<String> services);
+data WorkflowData = WorkflowData(String wfName, List<String> services);
 
+// workflow requests sent by clients to the master load balancer
 data ClientRequest = ClientRequest(WorkflowData wf, Int rps);
+
+// single service request sent by the laod balancer to a node
+data NodeRequest = NodeRequest(String service, String wfName, Int rps);
 
 interface ServiceTask{
   Unit execute();
