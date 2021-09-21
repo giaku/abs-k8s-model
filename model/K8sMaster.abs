@@ -154,11 +154,32 @@ interface Node{
   // flush the list of the node request computing the total costs for its services
   // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
   Unit convertRps(){
-    Map<String,Int> serviceConsumptions = map(); // map to store the total consumption
+    Map<String,Map<String,Int>> serviceConsumptions = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
 
     // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
     for (nodeReq in nodeReqsQueue){ // cycle through the node requests in the queue
+      // decompose the NodeRequest
+      String reqService = service(nodeReq);
+      String reqWf = wfName(nodeReq);
+      Int reqRps = rps(nodeReq);
 
+      // retrieve the current total rps for that <Service,Workflow> and compute the new amount
+      Map<String,Int> sMap = lookupDefault(serviceConsumptions,reqService,map());
+      Int currentRps = lookupDefault(sMap,reqWf,0);
+      currentRps = currentRps + reqRps;
+
+      // update the service and gloabl maps
+      sMap = put(sMap,reqWf,currentRps);
+      serviceConsumptions = put(serviceConsumptions,reqService,sMap);
+    }
+
+    services = keys(serviceConsumptions); // services involved
+
+    for (service in services){
+      Map<String,Int> sMap = lookup(serviceConsumptions,service);
+
+      List<Int> rpsValues = values(sMap);
+      Int totalRps = foldr(+)(rpsValues,0); // total rps for that service
     }
 
     // SOMMARE SU SERVIZIO MANTENENDO LE QUOTE PER WF

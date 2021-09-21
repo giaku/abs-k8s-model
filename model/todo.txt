@@ -2,3 +2,12 @@
 - LOAD BALANCING: rps balancing between nodes
 - FOR EVERY NODE TYPE: table to convert rps,wf,service -> millicores
 - MIXED WORKFLOWS: weighted average between workflows
+
+Client -[1]-> MasterLB -[2]-> Nodes -[3]-> Pods -[4]-> Node
+
+[1]: a Client sends a ClientRequest(Wf,Rps) to the Master Loadbalancer.
+[2]: the MLB splits the request into NodeRequests(Service,Wf,Rps), so per Service involved in the Workflow, and also splits the Rps among the nodes based on some policy (RR between pods for now),generating one NodeRequest for each involved Node. These requests are sent to the respective Nodes.
+[3]: Once a Node has received all the NodeRequests for the Time Unit, it computes the resulting CPU consumption in millicores using its conversion table (result of the calibration), generates and sends the Requests(Service,CpuConsumption,MemoryConsumption,Rps) to its Pods.
+[4]: at this point, the legacy part of the model comes in, the Pods process their Requests consuming resources on the Node they're deployed onto. 
+
+1) Do we want to keep track of the requests from start to finish? For example to be able to know when the entire workload of a ClientRequest has been completed.
