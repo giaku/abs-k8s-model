@@ -90,7 +90,9 @@ interface Node{
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
                                                                     Rat baseSystemCpuLoad, NodeResourcesMonitor monitor,
                                                                     Int costGranularity, Map<String,Int> podsMap,
-                                                                    MasterLoadbalancer mlb, Map<String,Map<String,Map<Int,Rat>>> calibrationMaps) implements Node{
+                                                                    MasterLoadbalancer mlb,
+                                                                    Map<String,Map<Int,Map<String,Rat>>> calibrationMaps // <WF , <RPS , <SERVICE , millicores>>>
+                                                                    ) implements Node{
   List<ResourcesMonitor> pMonitors = list[];
   List<Pod> pods = list[];
   String name = "";
@@ -155,6 +157,7 @@ interface Node{
   // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
   Unit convertRps(){
     Map<String,Map<String,Int>> serviceConsumptions = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
+    Map<String,Int> totRpsMap = map();
 
     // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
     for (nodeReq in nodeReqsQueue){ // cycle through the node requests in the queue
@@ -175,13 +178,15 @@ interface Node{
 
     services = keys(serviceConsumptions); // services involved
 
-    for (service in services){
+    for (service in services){ // create a map with <service,total rps>
       Map<String,Int> sMap = lookup(serviceConsumptions,service);
 
       List<Int> rpsValues = values(sMap);
       Int totalRps = foldr(+)(rpsValues,0); // total rps for that service
+      totRpsMap = put(totRpsMap,service,totalRps);
     }
 
+    Map<String,Map<String,Rat>> serviceWfConsumptionsMap = buildServWfConsumptions()
     // SOMMARE SU SERVIZIO MANTENENDO LE QUOTE PER WF
 
     // LEGGERE DALLA TABELLA + MEDIA PESATA
@@ -191,6 +196,41 @@ interface Node{
 
     // MANDARE LE REQ AI POD
   }
+
+  // takes total-rps and per-workflow-rps maps and generates the millicores consumptions map using the conversion table
+  Map<String,Map<String,Rat>> buildServWfConsumptions(Map<String,Map<String,Int>> serviceConsumptions, Map<String,Int> totRpsmap){
+    Map<String,Map<String,Rat>> result = map();
+
+    List<String> services = keys(totRpsMap);
+    for (service in services){
+      Int tRps = lookup(totRpsMap,service);
+      Map<String,Int> servCMap = lookup(serviceConsumptions,service);
+      List<String> workflows = keys(servCMap);
+
+      Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = buildWfEntries(tRps,workflows);
+    }
+  }
+
+  // takes a rps value and a list of involved workflows, and returns a map that associate to every workflow
+  // the two nearest calibration entries (e1 < rps and e2 > rps) with their proportional weight,
+  // these weights are computed from the differences between e1,e2 and rps.
+  // example: rps=75, wf_entries=[50,100,150,200,250] => e1=50,weight=0.5 and e2=100,weight=0.5
+  Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> buildWfEntries(Int tRps, List<String> workflows){
+    Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> result = map();
+
+    for (wf in workflows){
+      Map<Int,Map<String,Rat>> wfEntMap = lookup(calibrationMaps,wf);
+      List<Int> entries = keys(wfEntMap);
+
+      Pair<Pair<Int,Rat>,Pair<Int,Rat>> weightedEntries = findNearestValues(tRps,entries);
+    }
+  }
+
+  // takes an Int N and a List<Int> and returns the nearest Ints (X1 and X2) in the list,
+  // s.t. X1 < N and X2 > N, and computes their weights according to their distance from N.
+  // If one of the elements of the list is equal to N: returns X1 with weight = 1 and the other one with weight = 0.
+  //
+  Pair<Pair<Int,Rat>,Pair<Int,Rat>> findNearestValues(Int tRps, List<Int> entries)
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
   Unit consumeSystemLoad(){
