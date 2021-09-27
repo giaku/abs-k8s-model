@@ -201,13 +201,15 @@ interface Node{
   Map<String,Map<String,Rat>> buildServWfConsumptions(Map<String,Map<String,Int>> serviceConsumptions, Map<String,Int> totRpsmap){
     Map<String,Map<String,Rat>> result = map();
 
-    List<String> services = keys(totRpsMap);
+    List<String> services = keys(totRpsMap); // all the services that received requests
     for (service in services){
-      Int tRps = lookup(totRpsMap,service);
-      Map<String,Int> servCMap = lookup(serviceConsumptions,service);
-      List<String> workflows = keys(servCMap);
+      Int tRps = lookup(totRpsMap,service); // total rps for the service
+      Map<String,Int> servConsMap = lookup(serviceConsumptions,service); // map with (WF,RPS) for that service
+      List<String> workflows = keys(servConsMap); // Wfs involved for that service
 
-      Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = buildWfEntries(tRps,workflows);
+      Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = buildWfEntries(tRps,workflows); // return the weighted entries in the conversionTable for the involved workflows
+
+      Rat millicoresLoad = computeServiceLoad(service,wfCalibEntries,servConsMap);
     }
   }
 
@@ -223,14 +225,53 @@ interface Node{
       List<Int> entries = keys(wfEntMap);
 
       Pair<Pair<Int,Rat>,Pair<Int,Rat>> weightedEntries = findNearestValues(tRps,entries);
+
+      result = put(result,wf,weightedEntries);
     }
+
+    return result;
   }
 
   // takes an Int N and a List<Int> and returns the nearest Ints (X1 and X2) in the list,
   // s.t. X1 < N and X2 > N, and computes their weights according to their distance from N.
   // If one of the elements of the list is equal to N: returns X1 with weight = 1 and the other one with weight = 0.
   //
-  Pair<Pair<Int,Rat>,Pair<Int,Rat>> findNearestValues(Int tRps, List<Int> entries)
+  Pair<Pair<Int,Rat>,Pair<Int,Rat>> findNearestValues(Int tRps, List<Int> entries){
+    Int higher = 10000;
+    Int lower = -1;
+
+    for (entry in entries){
+      if (entry == tRps){ // exact entry value
+        return Pair(Pair(tRps,1),Pair(0,0));
+      } else if (entry < tRps && entry > lower){ // update lower value
+        lower = entry;
+      } else if (entry > tRps && entry < higher){ // update higher value
+        higher = entry;
+      }
+    }
+
+    // check if it's outside the calibration entries boundaries
+    if (higher == 10000){
+      return Pair(Pair(lower,1),Pair(0,0));
+    } else if (lower == -1){
+      return Pair(Pair(higher,1),Pair(0,0));
+    }
+
+    // compute weights
+    Int distance = higher - lower; // distance between the two entries
+    Rat lWeight = (higher - tRps) / distance; // lower weight: proportion of 'higher' from tRps over the total entries distance
+    Rat hWeight = 1 - lWeight; // higher weight
+
+    return Pair(Pair(lower,lWeight),Pair(higher,hWeight));
+  }
+
+  // takes a service and computes its total load in millicores. This is made through the rps values per workflow involved and
+  // which entries to look for in the calibrationTable.
+  Rat computeServiceLoad(String service, Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries, Map<String,Int> servConsMap){
+    // retrieve and compute the wf values using the entries in the calibrationTable
+
+    // weight these values according to the composition of the total rps
+  }
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
   Unit consumeSystemLoad(){
