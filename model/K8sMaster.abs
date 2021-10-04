@@ -156,7 +156,7 @@ interface Node{
   // flush the list of the node request computing the total costs for its services
   // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
   Unit convertRps(){
-    Map<String,Map<String,Int>> serviceConsumptions = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
+    Map<String,Map<String,Int>> serviceWfRpsMap = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
     Map<String,Int> totRpsMap = map();
 
     // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
@@ -167,29 +167,26 @@ interface Node{
       Int reqRps = rps(nodeReq);
 
       // retrieve the current total rps for that <Service,Workflow> and compute the new amount
-      Map<String,Int> sMap = lookupDefault(serviceConsumptions,reqService,map());
+      Map<String,Int> sMap = lookupDefault(serviceWfRpsMap,reqService,map());
       Int currentRps = lookupDefault(sMap,reqWf,0);
       currentRps = currentRps + reqRps;
 
       // update the service and gloabl maps
       sMap = put(sMap,reqWf,currentRps);
-      serviceConsumptions = put(serviceConsumptions,reqService,sMap);
+      serviceWfRpsMap = put(serviceWfRpsMap,reqService,sMap);
     }
 
-    services = keys(serviceConsumptions); // services involved
+    services = keys(serviceWfRpsMap); // services involved
 
     for (service in services){ // create a map with <service,total rps>
-      Map<String,Int> sMap = lookup(serviceConsumptions,service);
+      Map<String,Int> sMap = lookup(serviceWfRpsMap,service);
 
       List<Int> rpsValues = values(sMap);
       Int totalRps = foldr(+)(rpsValues,0); // total rps for that service
       totRpsMap = put(totRpsMap,service,totalRps);
     }
 
-    Map<String,Map<String,Rat>> serviceWfConsumptionsMap = buildServWfConsumptions()
-    // SOMMARE SU SERVIZIO MANTENENDO LE QUOTE PER WF
-
-    // LEGGERE DALLA TABELLA + MEDIA PESATA
+    Map<String,Rat> serviceConsumptionsMap = buildServWfConsumptions(serviceWfRpsMap,totRpsMap);
 
     // CREARE LE REQUEST CON IL CARICO, DIVISE GIA' PER POD
     // mandare al pod con il processRequest
@@ -198,19 +195,22 @@ interface Node{
   }
 
   // takes total-rps and per-workflow-rps maps and generates the millicores consumptions map using the conversion table
-  Map<String,Map<String,Rat>> buildServWfConsumptions(Map<String,Map<String,Int>> serviceConsumptions, Map<String,Int> totRpsmap){
-    Map<String,Map<String,Rat>> result = map();
+  Map<String,Rat> buildServWfConsumptions(Map<String,Map<String,Int>> serviceWfRpsMap, Map<String,Int> totRpsmap){
+    Map<String,Rat> result = map();
 
     List<String> services = keys(totRpsMap); // all the services that received requests
     for (service in services){
       Int tRps = lookup(totRpsMap,service); // total rps for the service
-      Map<String,Int> servConsMap = lookup(serviceConsumptions,service); // map with (WF,RPS) for that service
-      List<String> workflows = keys(servConsMap); // Wfs involved for that service
+      Map<String,Int> servWfRpsMap = lookup(serviceWfRpsMap,service); // map with (WF,RPS) for that service
+      List<String> workflows = keys(servWfRpsMap); // Wfs involved for that service
 
       Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = buildWfEntries(tRps,workflows); // return the weighted entries in the conversionTable for the involved workflows
 
-      Rat millicoresLoad = computeServiceLoad(service,wfCalibEntries,servConsMap);
+      Rat millicoresLoad = computeServiceLoad(service,wfCalibEntries,servWfRpsMap);
+      result = put(result,service,millicoresLoad);
     }
+
+    return result;
   }
 
   // takes a rps value and a list of involved workflows, and returns a map that associate to every workflow
@@ -268,9 +268,44 @@ interface Node{
   // takes a service and computes its total load in millicores. This is made through the rps values per workflow involved and
   // which entries to look for in the calibrationTable.
   Rat computeServiceLoad(String service, Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries, Map<String,Int> servConsMap){
+    Map<String,Rat> wfRawLoads = map[];
+    List<String> wfs = keys(servConsMap);
+
     // retrieve and compute the wf values using the entries in the calibrationTable
+    for (wf in wfs){
+      // take the corresponding pair of entries and decompose them
+      Pair<Pair<Int,Rat>,Pair<Int,Rat>> cEntries = lookup(wfCalibEntries,wf);
+      Int e1 = fst(fst(cEntries)); Rat w1 = snd(fst(cEntries));
+      Int e2 = fst(snd(cEntries)); Rat w2 = snd(snd(cEntries));
+
+      // read from the calibration map of the node
+      Map<Int,Map<String,Rat>> wfCalibMap = lookup(calibrationMaps,wf);
+      Map<String,Rat> firstRpsEntryMap = lookup(wfCalibMap,e1); // services map for that entry
+      Rat e1Millicores = lookup(firstRpsEntryMap,service); // read the millicores consumption for the service
+
+      if (w1 < 1){ // there are actually two valid weighted entries
+        Map<String,Rat> secondRpsEntryMap = lookup(wfCalibMap,e2);
+        Rat e2Millicores = lookup(secondRpsEntryMap,service);
+
+        Rat wfRawLoad = e1Millicores * w1 + e2Millicores * w2; // multiply the values for their weights
+        wfRawLoads = put(wfRawLoads,wf,wfRawLoad); // update the resulting map
+      } else { // bad entry pair, just one value
+        wfRawLoads = put(wfRawLoads,wf,e1Millicores); // update the resulting map
+      }
+    }
 
     // weight these values according to the composition of the total rps
+    Rat result = 0;
+    Int totalRps = 0;
+    for (wf in wfs){
+      Rat rawLoad = lookup(wfRawLoads,wf);
+      Int wfRps = lookup(servConsMap,wf);
+      totalRps = totalRps + wfRps; // compute total rps
+      result = result + rawLoad * wfRps; // add weighted load for the wf
+    }
+
+    result = result / totalRps; // divide for the total rps to get the actual milllicores value
+    return result;
   }
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
