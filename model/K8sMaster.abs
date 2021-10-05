@@ -89,7 +89,7 @@ interface Node{
 }
 [Scheduler: node_reset_resources_scheduler(queue)] class NodeObject(Int id, Rat cpu, Rat memory, Rat timeUnitSize, Int cycle,
                                                                     Rat baseSystemCpuLoad, NodeResourcesMonitor monitor,
-                                                                    Int costGranularity, Map<String,Int> podsMap,
+                                                                    Int costGranularity,
                                                                     MasterLoadbalancer mlb,
                                                                     Map<String,Map<Int,Map<String,Rat>>> calibrationMaps // <WF , <RPS , <SERVICE , millicores>>>
                                                                     ) implements Node{
@@ -111,6 +111,8 @@ interface Node{
 
   // fixed nodes calibration features
   List<NodeRequest> nodeReqsQueue = list[];
+  Map<String,Int> podsMap = map();
+  Map<String,List<Pod>> servPodsReferenceMap = map();
 
   {
     this.name = ("Node-" + toString(id));
@@ -153,7 +155,8 @@ interface Node{
     this!resetResources();
   }
 
-  // flush the list of the node request computing the total costs for its services
+  // flush the list of the node request computing the total costs for its services, generates and sends requests
+  // with millicores costs directly to the pods, rps are balanced as round robin among the pods.
   // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
   Unit convertRps(){
     Map<String,Map<String,Int>> serviceWfRpsMap = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
@@ -186,12 +189,33 @@ interface Node{
       totRpsMap = put(totRpsMap,service,totalRps);
     }
 
+    // from the wfs and total rps maps generates the consumptions in millicores
     Map<String,Rat> serviceConsumptionsMap = buildServWfConsumptions(serviceWfRpsMap,totRpsMap);
 
-    // CREARE LE REQUEST CON IL CARICO, DIVISE GIA' PER POD
-    // mandare al pod con il processRequest
+    for (service in services){ // generates and sends the requests for the pods of the service
+      Int totServRps = lookup(sMap,service);
+      Int nOfServPods = lookup(podsMap,service);
+      Rat serviceCost = lookup(serviceConsumptionsMap,service);
+      Rat costPerRps = serviceCost / totServRps;
 
-    // MANDARE LE REQ AI POD
+      List<Pod> servicePods = lookup(this.servPodsReferenceMap,service); // list of pods of the service, used to send the reqs
+
+      List<Int> rpsQuotas = generatePodsRequestsSizes(totServRps,nOfServPods);
+
+      Int index = 0;
+      while (index < nOfServPods){ // cycle thorugh the list of quotas and the list of pods simoultaneously
+        rpsQuota = nth(rpsQuotas,index); // <index> quota in the list
+        Rat requestCost = costPerRps * rpsQuota; // compute the cost
+
+        Request req = Request(service,requestCost,0,rpsQuota); // generate the request
+
+        Pod p = nth(servicePods); // <index> pod reference in the list
+
+        p!processRequest(req); // send the request
+
+        index = index + 1;
+      }
+    }
   }
 
   // takes total-rps and per-workflow-rps maps and generates the millicores consumptions map using the conversion table
@@ -308,6 +332,26 @@ interface Node{
     return result;
   }
 
+  // returns a list wiht the quotas of rps for each pod given a number of rps and a number of pods.
+  List<Int> generatePodsRequestsSizes(Int totRps, Int nOfPods){
+    List<Int> result = list();
+
+    Int rPerPod = truncate(totRps / nOfPods);
+    Int remainingSize = totRps % nOfPods;
+
+    Int index = 0;
+    while (index < nOfPods){
+      if (index < remainingSize){
+        result = appendright(result,rPerPod + 1);
+      } else {
+        result = appendright(result,rPerPod);
+      }
+      index = index + 1;
+    }
+
+    return result;
+  }
+
   // consumes remaining system load, if there, after all pod consumptions in the time unit
   Unit consumeSystemLoad(){
     await duration(cycle/2,cycle/2);
@@ -396,8 +440,12 @@ interface Node{
     this.requestedCpu = this.requestedCpu + reqCpu;
     monitor!setRequestedCpu(this.requestedCpu);
 
-    // update the podsMap
-    nPods = lookupDefault(podsMap,serviceName,-1);
+    // update the podsMaps
+    List<Pod> servPods = lookupDefault(this.servPodsReferenceMap,serviceName,list[]);
+    servPods = appendright(servPods,p);
+    this.servPodsReferenceMap = put(this.servPodsReferenceMap,servPods);
+
+    Int nPods = lookupDefault(podsMap,serviceName,-1);
     if (nPods == -1){
       this.podsMap = put(this.podsMap,serviceName,1);
     } else {
@@ -415,6 +463,10 @@ interface Node{
     monitor!setRequestedCpu(this.requestedCpu);
 
     // update the podsMap
+    List<Pod> servPods = lookupDefault(this.servPodsReferenceMap,serviceName,list[]);
+    servPods = without(servPods,p);
+    this.servPodsReferenceMap = put(this.servPodsReferenceMap,servPods);
+
     nPods = lookupDefault(podsMap,serviceName,-1);
     if (nPods == -1 || nPods == 0){
       println("===== ===== ERROR: REMOVING A POD FROM AN EMPTY NODE ===== =====");
