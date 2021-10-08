@@ -131,7 +131,7 @@ interface Node{
     systemCpuLoad = baseSystemCpuLoad;
     remainingSysLoadSteps = costGranularity;
     this!resetResources();
-    this!consumeSystemLoad();
+    this!midTimeUnitEvents();
     this!consumeSystemCpu();
   }
 
@@ -361,12 +361,13 @@ interface Node{
   }
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
-  Unit consumeSystemLoad(){
+  Unit midTimeUnitEvents(){
     await duration(cycle/2,cycle/2);
 
     availableCpu = availableCpu - systemCpuLoad;
     //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "]" + "SYSTEM consumed: " + toString(systemCpuLoad) + " SYSTEM DISCHARGE");
     systemCpuLoad = 0;
+    this.convertRps();
 
     await duration(cycle/2,cycle/2);
 
