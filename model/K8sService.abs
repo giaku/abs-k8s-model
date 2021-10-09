@@ -415,6 +415,7 @@ class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, S
     Node n = await scheduler!deployPod(p,rm);
     p!setNode(n);
     rm!setNode(n);
+    await lb!addPod(p,rm);
 
     this.nextID = this.nextID + 1;
     this.nPods = this.nPods + 1;

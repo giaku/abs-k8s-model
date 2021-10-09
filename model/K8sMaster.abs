@@ -6,8 +6,9 @@ import * from ABS.DC;
 import * from K8sService;
 import * from K8sUtil;
 import * from ABS.Scheduler;
+import * from K8sWorkflow;
 
-data NodeType = NodeType(String typeName, Map<String,Int> podsNumber)
+data NodeType = NodeType(String typeName, Map<String,Int> podsNumber);
 
 //
 // MASTER
@@ -86,7 +87,7 @@ interface Node{
   Rat releaseMemory(Rat amount);
 
   Unit addPod(Pod p, ResourcesMonitor rm, String serviceName);
-  Unit removePod(Pod p, ResourcesMonitor rm);
+  Unit removePod(Pod p, ResourcesMonitor rm, String serviceName);
 
   List<Pod> getPods();
 
@@ -119,8 +120,8 @@ interface Node{
 
   // fixed nodes calibration features
   List<NodeRequest> nodeReqsQueue = list[];
-  Map<String,Int> podsMap = map();
-  Map<String,List<Pod>> servPodsReferenceMap = map();
+  Map<String,Int> podsMap = map[]; // <SERVICE,nOfPods>
+  Map<String,List<Pod>> servPodsReferenceMap = map[]; // <SERVICE,list of pods deployed>
 
   {
     this.name = ("Node-" + toString(id));
@@ -163,85 +164,67 @@ interface Node{
     this!resetResources();
   }
 
-  // flush the list of the node request computing the total costs for its services, generates and sends requests
-  // with millicores costs directly to the pods, rps are balanced as round robin among the pods.
-  // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
-  Unit convertRps(){
-    Map<String,Map<String,Int>> serviceWfRpsMap = map(); // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
-    Map<String,Int> totRpsMap = map();
+  // takes an Int N and a List<Int> and returns the nearest Ints (X1 and X2) in the list,
+  // s.t. X1 < N and X2 > N, and computes their weights according to their distance from N.
+  // If one of the elements of the list is equal to N: returns X1 with weight = 1 and the other one with weight = 0.
+  //
+  Pair<Pair<Int,Rat>,Pair<Int,Rat>> findNearestValues(Int tRps, List<Int> entries){
+    Bool exactEntry = False;
+    Bool outLower = False;
+    Bool outHigher = False;
 
-    // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
-    for (nodeReq in nodeReqsQueue){ // cycle through the node requests in the queue
-      // decompose the NodeRequest
-      String reqService = service(nodeReq);
-      String reqWf = wfName(nodeReq);
-      Int reqRps = rps(nodeReq);
+    Pair<Pair<Int,Rat>,Pair<Int,Rat>> result = Pair(Pair(0,0),Pair(0,0));
 
-      // retrieve the current total rps for that <Service,Workflow> and compute the new amount
-      Map<String,Int> sMap = lookupDefault(serviceWfRpsMap,reqService,map());
-      Int currentRps = lookupDefault(sMap,reqWf,0);
-      currentRps = currentRps + reqRps;
+    Int higher = 10000;
+    Int lower = -1;
 
-      // update the service and gloabl maps
-      sMap = put(sMap,reqWf,currentRps);
-      serviceWfRpsMap = put(serviceWfRpsMap,reqService,sMap);
+    Int index = 0;
+
+    while (!exactEntry && index < length(entries)){
+      Int entry = nth(entries,index);
+
+      println("NODE: " +  toString(this) + "findNearestValues "
+              + "ENTRY:" + toString(entry) + " INDEX:" + toString(index)
+              + " WF_RPS:" + toString(tRps) +
+              "LOWER ENTRY:" + toString(lower) +
+              "HIGHER ENTRY:" + toString(higher));
+
+      if (entry == tRps){ // exact entry value
+        result = Pair(Pair(tRps,1),Pair(0,0));
+        exactEntry = True;
+      } else if (entry < tRps && entry > lower){ // update lower value
+        lower = entry;
+      } else if (entry > tRps && entry < higher){ // update higher value
+        higher = entry;
+      }
+      index = index + 1;
     }
 
-    services = keys(serviceWfRpsMap); // services involved
+    println("NODE: " +  toString(this) + "findNearestValues "
+            + " WF_RPS:" + toString(tRps) +
+            "LOWER ENTRY:" + toString(lower) +
+            "HIGHER ENTRY:" + toString(higher));
 
-    for (service in services){ // create a map with <service,total rps>
-      Map<String,Int> sMap = lookup(serviceWfRpsMap,service);
-
-      List<Int> rpsValues = values(sMap);
-      Int totalRps = foldr(+)(rpsValues,0); // total rps for that service
-      totRpsMap = put(totRpsMap,service,totalRps);
-    }
-
-    // from the wfs and total rps maps generates the consumptions in millicores
-    Map<String,Rat> serviceConsumptionsMap = buildServWfConsumptions(serviceWfRpsMap,totRpsMap);
-
-    for (service in services){ // generates and sends the requests for the pods of the service
-      Int totServRps = lookup(sMap,service);
-      Int nOfServPods = lookup(podsMap,service);
-      Rat serviceCost = lookup(serviceConsumptionsMap,service);
-      Rat costPerRps = serviceCost / totServRps;
-
-      List<Pod> servicePods = lookup(this.servPodsReferenceMap,service); // list of pods of the service, used to send the reqs
-
-      List<Int> rpsQuotas = generatePodsRequestsSizes(totServRps,nOfServPods);
-
-      Int index = 0;
-      while (index < nOfServPods){ // cycle thorugh the list of quotas and the list of pods simoultaneously
-        rpsQuota = nth(rpsQuotas,index); // <index> quota in the list
-        Rat requestCost = costPerRps * rpsQuota; // compute the cost
-
-        Request req = Request(service,requestCost,0,rpsQuota); // generate the request
-
-        Pod p = nth(servicePods); // <index> pod reference in the list
-
-        p!processRequest(req); // send the request
-
-        index = index + 1;
+    // check if it's outside the calibration entries boundaries
+    if (!exactEntry){
+      if (higher == 10000){
+        result = Pair(Pair(lower,1),Pair(0,0));
+        outHigher = True;
+      } else if (lower == -1){
+        result = Pair(Pair(higher,1),Pair(0,0));
+        outLower = True;
       }
     }
-  }
 
-  // takes total-rps and per-workflow-rps maps and generates the millicores consumptions map using the conversion table
-  Map<String,Rat> buildServWfConsumptions(Map<String,Map<String,Int>> serviceWfRpsMap, Map<String,Int> totRpsmap){
-    Map<String,Rat> result = map();
 
-    List<String> services = keys(totRpsMap); // all the services that received requests
-    for (service in services){
-      Int tRps = lookup(totRpsMap,service); // total rps for the service
-      Map<String,Int> servWfRpsMap = lookup(serviceWfRpsMap,service); // map with (WF,RPS) for that service
-      List<String> workflows = keys(servWfRpsMap); // Wfs involved for that service
+    if (!exactEntry && !outHigher && !outLower){
+      // compute weights
+      Int distance = higher - lower; // distance between the two entries
+      Rat lWeight = (higher - tRps) / distance; // lower weight: proportion of 'higher' from tRps over the total entries distance
+      Rat hWeight = 1 - lWeight; // higher weight
 
-      Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = buildWfEntries(tRps,workflows); // return the weighted entries in the conversionTable for the involved workflows
-
-      Rat millicoresLoad = computeServiceLoad(service,wfCalibEntries,servWfRpsMap);
-      result = put(result,service,millicoresLoad);
+      result = Pair(Pair(lower,lWeight),Pair(higher,hWeight));
     }
-
     return result;
   }
 
@@ -250,13 +233,13 @@ interface Node{
   // these weights are computed from the differences between e1,e2 and rps.
   // example: rps=75, wf_entries=[50,100,150,200,250] => e1=50,weight=0.5 and e2=100,weight=0.5
   Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> buildWfEntries(Int tRps, List<String> workflows){
-    Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> result = map();
+    Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> result = map[];
 
-    for (wf in workflows){
-      Map<Int,Map<String,Rat>> wfEntMap = lookup(calibrationMaps,wf);
-      List<Int> entries = keys(wfEntMap);
+    foreach (wf in workflows){
+      Map<Int,Map<String,Rat>> wfEntMap = lookupDefault(calibrationMaps,wf,map[]);
+      List<Int> entries = elements(keys(wfEntMap));
 
-      Pair<Pair<Int,Rat>,Pair<Int,Rat>> weightedEntries = findNearestValues(tRps,entries);
+      Pair<Pair<Int,Rat>,Pair<Int,Rat>> weightedEntries = this.findNearestValues(tRps,entries);
 
       result = put(result,wf,weightedEntries);
     }
@@ -264,60 +247,120 @@ interface Node{
     return result;
   }
 
-  // takes an Int N and a List<Int> and returns the nearest Ints (X1 and X2) in the list,
-  // s.t. X1 < N and X2 > N, and computes their weights according to their distance from N.
-  // If one of the elements of the list is equal to N: returns X1 with weight = 1 and the other one with weight = 0.
-  //
-  Pair<Pair<Int,Rat>,Pair<Int,Rat>> findNearestValues(Int tRps, List<Int> entries){
-    Int higher = 10000;
-    Int lower = -1;
+  // takes total-rps and per-workflow-rps maps and generates the millicores consumptions map using the conversion table
+  Map<String,Rat> buildServWfConsumptions(Map<String,Map<String,Int>> serviceWfRpsMap, Map<String,Int> totalRpsMap){
+    Map<String,Rat> result = map[];
 
-    for (entry in entries){
-      if (entry == tRps){ // exact entry value
-        return Pair(Pair(tRps,1),Pair(0,0));
-      } else if (entry < tRps && entry > lower){ // update lower value
-        lower = entry;
-      } else if (entry > tRps && entry < higher){ // update higher value
-        higher = entry;
+    List<String> services = elements(keys(totalRpsMap)); // all the services that received requests
+    foreach (service in services){
+      Int tRps = lookupDefault(totalRpsMap,service,0); // total rps for the service
+      Map<String,Int> servWfRpsMap = lookupDefault(serviceWfRpsMap,service,map[]); // map with (WF,RPS) for that service
+      List<String> workflows = elements(keys(servWfRpsMap)); // Wfs involved for that service
+
+      Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries = this.buildWfEntries(tRps,workflows); // return the weighted entries in the conversionTable for the involved workflows
+
+      foreach (workflow_name in elements(keys(wfCalibEntries))){
+        Pair<Pair<Int,Rat>,Pair<Int,Rat>> ntry = lookupDefault(wfCalibEntries,workflow_name,Pair(Pair(0,0),Pair(0,0)));
+        println("NODE: " +  toString(this) + "buildServWfConsumptions  SERVICE:" + service +
+                "WF:" + workflow_name + " WF_RPS:" + toString(tRps) +
+                "LOWER ENTRY:" + toString(fst(fst(ntry))) + ",W:" + toString(snd(fst(ntry))) +
+                "HIGHER ENTRY:" + toString(fst(snd(ntry))) + ",W:" + toString(snd(snd(ntry))));
+      }
+
+      Rat millicoresLoad = this.computeServiceLoad(service,wfCalibEntries,servWfRpsMap);
+      result = put(result,service,millicoresLoad);
+    }
+
+    return result;
+  }
+
+  // flush the list of the node request computing the total costs for its services, generates and sends requests
+  // with millicores costs directly to the pods, rps are balanced as round robin among the pods.
+  // this method is executed once every time unit, after all the incoming requests for the time unit are in the list
+  Unit convertRps(){
+    println("NODE: " +  toString(this) + ": convertRps METHOD STARTED");
+    Map<String,Map<String,Int>> serviceWfRpsMap = map[]; // map to store the total consumption 'Service' -> Map<'Workflow',Rps>
+    Map<String,Int> totRpsMap = map[];
+
+    // RACCOGLIERE RPS TOTALI PER <SERVIZIO,WF>
+    foreach (nodeReq in this.nodeReqsQueue){ // cycle through the node requests in the queue
+      // decompose the NodeRequest
+      String reqService = service(nodeReq);
+      String reqWf = wf_Name(nodeReq);
+      Int reqRps = rps_node(nodeReq);
+
+      // retrieve the current total rps for that <Service,Workflow> and compute the new amount
+      Map<String,Int> sMap = lookupDefault(serviceWfRpsMap,reqService,map[]);
+      Int currentRps = lookupDefault(sMap,reqWf,0);
+      currentRps = currentRps + reqRps;
+
+      // update the service and gloabl maps
+      sMap = put(sMap,reqWf,currentRps);
+      serviceWfRpsMap = put(serviceWfRpsMap,reqService,sMap);
+    }
+
+    List<String> services = elements(keys(serviceWfRpsMap)); // services involved
+
+    foreach (service in services){ // create a map with <service,total rps>
+      Map<String,Int> sMap = lookupDefault(serviceWfRpsMap,service,map[]);
+
+      List<Int> rpsValues = values(sMap);
+      Int totalRps = foldr((Int a,Int b) => a + b)(rpsValues,0); // total rps for that service
+      totRpsMap = put(totRpsMap,service,totalRps);
+    }
+
+    // from the wfs and total rps maps generates the consumptions in millicores
+    Map<String,Rat> serviceConsumptionsMap = this.buildServWfConsumptions(serviceWfRpsMap,totRpsMap);
+
+    foreach (service in services){ // generates and sends the requests for the pods of the service
+      Int totServRps = lookupDefault(totRpsMap,service,0);
+      Int nOfServPods = lookupDefault(podsMap,service,0);
+      Rat serviceCost = lookupDefault(serviceConsumptionsMap,service,0);
+      Rat costPerRps = serviceCost / totServRps;
+
+      List<Pod> servicePods = lookupDefault(this.servPodsReferenceMap,service,list[]); // list of pods of the service, used to send the reqs
+
+      List<Int> rpsQuotas = this.generatePodsRequestsSizes(totServRps,nOfServPods);
+
+      Int index = 0;
+      while (index < nOfServPods){ // cycle thorugh the list of quotas and the list of pods simoultaneously
+        Int rpsQuota = nth(rpsQuotas,index); // <index> quota in the list
+        Rat requestCost = costPerRps * rpsQuota; // compute the cost
+
+        Request req = Request(service,requestCost,1,rpsQuota); // generate the request
+
+        Pod p = nth(servicePods,index); // <index> pod reference in the list
+
+        p!processRequest(req); // send the request
+        println("NODE: " +  toString(this) + ": REQUEST: (" + service + " " + toString(requestCost) +
+                " rps:" + toString(rpsQuota) + " SENT TO POD:" + toString(p));
+
+        index = index + 1;
       }
     }
-
-    // check if it's outside the calibration entries boundaries
-    if (higher == 10000){
-      return Pair(Pair(lower,1),Pair(0,0));
-    } else if (lower == -1){
-      return Pair(Pair(higher,1),Pair(0,0));
-    }
-
-    // compute weights
-    Int distance = higher - lower; // distance between the two entries
-    Rat lWeight = (higher - tRps) / distance; // lower weight: proportion of 'higher' from tRps over the total entries distance
-    Rat hWeight = 1 - lWeight; // higher weight
-
-    return Pair(Pair(lower,lWeight),Pair(higher,hWeight));
   }
 
   // takes a service and computes its total load in millicores. This is made through the rps values per workflow involved and
   // which entries to look for in the calibrationTable.
   Rat computeServiceLoad(String service, Map<String,Pair<Pair<Int,Rat>,Pair<Int,Rat>>> wfCalibEntries, Map<String,Int> servConsMap){
     Map<String,Rat> wfRawLoads = map[];
-    List<String> wfs = keys(servConsMap);
+    List<String> wfs = elements(keys(servConsMap));
 
     // retrieve and compute the wf values using the entries in the calibrationTable
-    for (wf in wfs){
+    foreach (wf in wfs){
       // take the corresponding pair of entries and decompose them
-      Pair<Pair<Int,Rat>,Pair<Int,Rat>> cEntries = lookup(wfCalibEntries,wf);
+      Pair<Pair<Int,Rat>,Pair<Int,Rat>> cEntries = lookupDefault(wfCalibEntries,wf,Pair(Pair(0,0),Pair(0,0)));
       Int e1 = fst(fst(cEntries)); Rat w1 = snd(fst(cEntries));
       Int e2 = fst(snd(cEntries)); Rat w2 = snd(snd(cEntries));
 
       // read from the calibration map of the node
-      Map<Int,Map<String,Rat>> wfCalibMap = lookup(calibrationMaps,wf);
-      Map<String,Rat> firstRpsEntryMap = lookup(wfCalibMap,e1); // services map for that entry
-      Rat e1Millicores = lookup(firstRpsEntryMap,service); // read the millicores consumption for the service
+      Map<Int,Map<String,Rat>> wfCalibMap = lookupDefault(calibrationMaps,wf,map[]);
+      Map<String,Rat> firstRpsEntryMap = lookupDefault(wfCalibMap,e1,map[]); // services map for that entry
+      Rat e1Millicores = lookupDefault(firstRpsEntryMap,service,0); // read the millicores consumption for the service
 
       if (w1 < 1){ // there are actually two valid weighted entries
-        Map<String,Rat> secondRpsEntryMap = lookup(wfCalibMap,e2);
-        Rat e2Millicores = lookup(secondRpsEntryMap,service);
+        Map<String,Rat> secondRpsEntryMap = lookupDefault(wfCalibMap,e2,map[]);
+        Rat e2Millicores = lookupDefault(secondRpsEntryMap,service,0);
 
         Rat wfRawLoad = e1Millicores * w1 + e2Millicores * w2; // multiply the values for their weights
         wfRawLoads = put(wfRawLoads,wf,wfRawLoad); // update the resulting map
@@ -329,9 +372,9 @@ interface Node{
     // weight these values according to the composition of the total rps
     Rat result = 0;
     Int totalRps = 0;
-    for (wf in wfs){
-      Rat rawLoad = lookup(wfRawLoads,wf);
-      Int wfRps = lookup(servConsMap,wf);
+    foreach (wf in wfs){
+      Rat rawLoad = lookupDefault(wfRawLoads,wf,0);
+      Int wfRps = lookupDefault(servConsMap,wf,0);
       totalRps = totalRps + wfRps; // compute total rps
       result = result + rawLoad * wfRps; // add weighted load for the wf
     }
@@ -342,7 +385,7 @@ interface Node{
 
   // returns a list wiht the quotas of rps for each pod given a number of rps and a number of pods.
   List<Int> generatePodsRequestsSizes(Int totRps, Int nOfPods){
-    List<Int> result = list();
+    List<Int> result = list[];
 
     Int rPerPod = truncate(totRps / nOfPods);
     Int remainingSize = totRps % nOfPods;
@@ -362,16 +405,18 @@ interface Node{
 
   // consumes remaining system load, if there, after all pod consumptions in the time unit
   Unit midTimeUnitEvents(){
+    println("NODE: " +  toString(this) + ": midTimeUnitEvents METHOD STARTED");
     await duration(cycle/2,cycle/2);
-
+    println("NODE: " +  toString(this) + ": midTimeUnitEvents HALF UNIT PASSED");
     availableCpu = availableCpu - systemCpuLoad;
     //println("{TIME " + toString(timeValue(now())) + "} " + "[NODE " + toString(id) + "]" + "SYSTEM consumed: " + toString(systemCpuLoad) + " SYSTEM DISCHARGE");
     systemCpuLoad = 0;
     this.convertRps();
-
+    this.nodeReqsQueue = list[];
+    println("NODE: " +  toString(this) + ": midTimeUnitEvents AFTER convertRps EXECUTION");
     await duration(cycle/2,cycle/2);
-
-    this!consumeSystemLoad();
+    println("NODE: " +  toString(this) + ": midTimeUnitEvents AFTER SECOND AWAIT -- END");
+    this!midTimeUnitEvents();
   }
 
   // consumes part of the system load
@@ -452,7 +497,7 @@ interface Node{
     // update the podsMaps
     List<Pod> servPods = lookupDefault(this.servPodsReferenceMap,serviceName,list[]);
     servPods = appendright(servPods,p);
-    this.servPodsReferenceMap = put(this.servPodsReferenceMap,servPods);
+    this.servPodsReferenceMap = put(this.servPodsReferenceMap,serviceName,servPods);
 
     Int nPods = lookupDefault(podsMap,serviceName,-1);
     if (nPods == -1){
@@ -474,12 +519,11 @@ interface Node{
     // update the podsMap
     List<Pod> servPods = lookupDefault(this.servPodsReferenceMap,serviceName,list[]);
     servPods = without(servPods,p);
-    this.servPodsReferenceMap = put(this.servPodsReferenceMap,servPods);
+    this.servPodsReferenceMap = put(this.servPodsReferenceMap,serviceName,servPods);
 
-    nPods = lookupDefault(podsMap,serviceName,-1);
+    Int nPods = lookupDefault(podsMap,serviceName,-1);
     if (nPods == -1 || nPods == 0){
       println("===== ===== ERROR: REMOVING A POD FROM AN EMPTY NODE ===== =====");
-      throw Exception;
     } else {
       this.podsMap = put(this.podsMap,serviceName,nPods - 1);
     }
@@ -509,7 +553,7 @@ interface Node{
 //
 interface NodeScheduler{
   //create nNodes with given cpu and memory amounts.
-  Bool createNodes(Int nNodes, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption, Int costGranularity);
+  Bool createNodes(Int nNodes, Map<String,Map<Int,Map<String,Rat>>> calibrationMaps, Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption, Int costGranularity);
 
   List<NodeState> getNodeStates();
   List<Node> getNodes();
@@ -545,6 +589,7 @@ class NodeSchedulerObject(CloudProvider cloud, MasterLoadbalancer mlb, Int loadP
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
       nodesMap = insert(nodesMap,Pair(nextID,node));
+      await mlb!addNode(node);
 
       this.nextID = nextID + 1;
       ctr = ctr + 1;
@@ -622,36 +667,42 @@ class NodeSchedulerObject(CloudProvider cloud, MasterLoadbalancer mlb, Int loadP
   }
 }
 
-interface MasterLoadbalancer(){
+interface MasterLoadbalancer{
   Unit sendClientRequest(ClientRequest request);
 
-  Unit addNode(Node n, Map<String,Int> podsMap);
+  Unit addNode(Node n);
 
   Unit updateNodeMap(Node node, Map<String,Int> podsMap);
 }
 class MasterLoadbalancerObject() implements MasterLoadbalancer{
   List<Node> activeNodes = list[]; // currently active nodes in the system
-  Map<Node,Map<String,Int>> activeNodesMaps = map(); // map contating the maps that indicates how many pods of a chosen service are deployed on the node
+  Map<Node,Map<String,Int>> activeNodesMaps = map[]; // map contating the maps that indicates how many pods of a chosen service are deployed on the node
                                              // i.e. node1 -> [activeNodesMaps] = node1PodsMap; "service1" -> [node1PodsMap] = number of pods of service1 deployed on node1
-  Map<String,Map<Node,Int>> perServicePodsNumber = map(); // service based map, better for balancing
+  Map<String,Map<Node,Int>> perServicePodsNumber = map[]; // service based map, better for balancing
 
   Unit sendClientRequest(ClientRequest request){
     this.balanceClientRequest(request);
   }
 
+  Unit addNode(Node node){
+    this.activeNodes = appendright(this.activeNodes,node);
+    this.activeNodesMaps = put(this.activeNodesMaps,node,map[]);
+  }
+
   Unit balanceClientRequest(ClientRequest request){
       WorkflowData wfd = wf(request);
+      String wfName = wfName(wfd);
       List<String> services = services(wfd);
 
       foreach (service in services){ // cycle through services of the workflow and balance the rps with a round-robin policy among the pods
-        Map<Node,Int> servicePodMap = lookup(perServicePodsNumber,service);
-        List<Pair<Node,Int>> quotas = generateSubrequestsSizes(rps(request),servicePodMap);
+        Map<Node,Int> servicePodMap = lookupDefault(perServicePodsNumber,service,map[]);
+        List<Pair<Node,Int>> quotas = this.generateSubrequestsSizes(rps(request),servicePodMap);
 
         foreach (quota in quotas){ // generate and forward the sub-requests
           Node node = fst(quota);
           Int size = snd(quota);
 
-          NodeRequest nodeReq = NodeRequest(service,wfName(wfd),size); // create the node request (service,wf,rps) and sends it to the node
+          NodeRequest nodeReq = NodeRequest(service,wfName,size); // create the node request (service,wf,rps) and sends it to the node
           node!processRequest(nodeReq); // send the request to the node
         }
       }
@@ -661,14 +712,14 @@ class MasterLoadbalancerObject() implements MasterLoadbalancer{
   // between the pods.
   // the remaining K requests (K < Total number of pods for the service) are just given to the first K pods. (not balancing between the nodes)
   List<Pair<Node,Int>> generateSubrequestsSizes(Int rSize, Map<Node,Int> podsMap){
-    List<Pair<Node,Int>> result = list();
-    Int totalPods = foldr(+)(values(podsMap), 0);
+    List<Pair<Node,Int>> result = list[];
+    Int totalPods = foldr((Int a, Int b) => a + b)(values(podsMap), 0);
 
-    rPerPod = truncate(rSize / totalPods);
-    remainingSize = rSize % totalPods;
+    Int rPerPod = truncate(rSize / totalPods);
+    Int remainingSize = rSize % totalPods;
 
-    foreach (node in keys(podsMap)){
-      Int nodePods = lookup(podsMap,node);
+    foreach (node in elements(keys(podsMap))){
+      Int nodePods = lookupDefault(podsMap,node,0);
       Int subReqSize = rPerPod * nodePods;
 
       if (remainingSize >= nodePods){
@@ -679,7 +730,7 @@ class MasterLoadbalancerObject() implements MasterLoadbalancer{
         remainingSize = 0;
       }
 
-      result = appendright(result,pair(node,subReqSize));
+      result = appendright(result,Pair(node,subReqSize));
     }
 
     return result;
@@ -692,11 +743,11 @@ class MasterLoadbalancerObject() implements MasterLoadbalancer{
 
   // updates the number of pods in the service based map
   Unit updatePerServicePods(Node node, Map<String,Int> map){
-    List<String> services = list(keys(map));
+    List<String> services = elements(keys(map));
 
     foreach (service in services){ // for every service of the updated node:
-      podMap = lookupDefault(perServicePodsNumber,service,map()); // take the map of that service
-      podsNumber = lookup(map,service); // read the updated number of pods for that node
+      Map<Node,Int> podMap = lookupDefault(perServicePodsNumber,service,map[]); // take the map of that service
+      Int podsNumber = lookupDefault(map,service,0); // read the updated number of pods for that node
       podMap = put(podMap,node,podsNumber); // udpate the node entry in the service map
 
       perServicePodsNumber = put(perServicePodsNumber,service,podMap); // update the service entry in the perService map

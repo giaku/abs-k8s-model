@@ -1,0 +1,1 @@
+absc -e %1 K8sMaster.abs K8sService.abs K8sUtil.abs K8sWorkflow.abs K8sClients.abs && run.bat %~n1 && cd .. && cd ..

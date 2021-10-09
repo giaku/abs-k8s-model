@@ -16,7 +16,7 @@ data WorkflowData = WorkflowData(String wfName, List<String> services);
 data ClientRequest = ClientRequest(WorkflowData wf, Int rps);
 
 // single service request sent by the laod balancer to a node
-data NodeRequest = NodeRequest(String service, String wfName, Int rps);
+data NodeRequest = NodeRequest(String service, String wf_Name, Int rps_node);
 
 interface ServiceTask{
   Unit execute();

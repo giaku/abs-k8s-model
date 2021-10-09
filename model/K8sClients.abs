@@ -3,11 +3,26 @@ module K8sClients;
 export *;
 
 import * from K8sWorkflow;
+import * from K8sMaster;
 
 interface Client{
   Unit start();
 }
-class ClientObject(ServiceTask t,Int times,Rat delay) implements Client {
+class ClientObject(ClientRequest cr,MasterLoadbalancer endpoint,Int times,Rat delay) implements Client {
+
+  Unit start(){
+    Int counter = times;
+
+    while(counter > 0){
+      endpoint!sendClientRequest(cr);
+      counter = counter - 1;
+      await duration(delay,delay);
+    }
+  }
+
+}
+
+class ClientObjectOld(ServiceTask t,Int times,Rat delay) implements Client {
 
   Unit start(){
     Int counter = times;
