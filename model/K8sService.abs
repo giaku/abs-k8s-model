@@ -12,7 +12,7 @@ import * from K8sMaster;
 // SERVICE
 //
 interface Service{
-  ServiceEndpoint getServiceEndpoint();
+  // ServiceEndpoint getServiceEndpoint();
 
   Unit deploy(NodeScheduler scheduler);
 
@@ -24,15 +24,14 @@ interface Service{
   String getName();
   Rat getUpscaleThreshold();
 }
-class ServiceObject(ServiceConfig sConfig, PodConfig pConfig, ServiceLoadBalancerPolicy policy) implements Service{
+class ServiceObject(ServiceConfig sConfig, PodConfig pConfig) implements Service{
   ServiceLoadBalancer lb = null;
   ServiceAutoscaler scaler = null;
-  ServiceEndpoint ep = null;
+  // ServiceEndpoint ep = null;
 
   Unit run(){
-    lb = new ServiceLoadBalancerObject(policy);
-    policy.setLb(lb);
-    ep = new ServiceEndpointObject(lb);
+    lb = new ServiceLoadBalancerObject();
+    // ep = new ServiceEndpointObject(lb);
   }
 
   Unit deploy(NodeScheduler scheduler){
@@ -40,9 +39,9 @@ class ServiceObject(ServiceConfig sConfig, PodConfig pConfig, ServiceLoadBalance
     scaler.initialize();
   }
 
-  ServiceEndpoint getServiceEndpoint(){
-    return this.ep;
-  }
+  // ServiceEndpoint getServiceEndpoint(){
+  //   return this.ep;
+  // }
 
   ServiceState getConsumption(){
     ServiceState cns = await lb!getConsumptions();
@@ -231,7 +230,7 @@ interface Pod {
 //
 interface ServiceLoadBalancer{
 
-  Map<Pod,Int> distributeRequest(Request req);
+  // Map<Pod,Int> distributeRequest(Request req);
   Unit addPod(Pod p, ResourcesMonitor rm);
   Unit removePod(Pod p);
   List<Pair<Pod,ResourcesMonitor>> getPods();
@@ -243,18 +242,18 @@ interface ServiceLoadBalancer{
   List<PodState> getPodsConsumptions();
 }
 
-class ServiceLoadBalancerObject(ServiceLoadBalancerPolicy policy) implements ServiceLoadBalancer{
+class ServiceLoadBalancerObject() implements ServiceLoadBalancer{
   //List of all the pods
   List<Pair<Pod,ResourcesMonitor>> pods = list[];
   //List to consider for scheduling, suspended pods not included
   List<Pod> activePods = list[];
 
-  Map<Pod,Int> distributeRequest(Request req){
-    //println("LB distributeRequest STARTED");
-    Map<Pod,Int> result = await policy!distributeRequest(req, activePods);
-
-    return result;
-  }
+  // Map<Pod,Int> distributeRequest(Request req){
+  //   //println("LB distributeRequest STARTED");
+  //   Map<Pod,Int> result = await policy!distributeRequest(req, activePods);
+  //
+  //   return result;
+  // }
 
   Unit addPod(Pod p, ResourcesMonitor rm){
     pods = appendright(pods,Pair(p,rm));
@@ -438,32 +437,32 @@ class ServiceAutoscalerObject(NodeScheduler scheduler, ServiceLoadBalancer lb, S
 interface ServiceEndpoint {
   Unit invokeService(Request request);
 }
-class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
-
-  Unit invokeService(Request request){
-    Int batchSize = batchSize(request);
-    Map<Pod,Int> scheduled = map[];
-    List<Fut<Unit>> processing = list[];
-
-    scheduled = await lb!distributeRequest(request);
-
-    foreach (p in elements(keys(scheduled))) {
-      // create sortedRequest multipling costs per ratio
-      Int nOfReq = lookupDefault(scheduled, p, 0);
-      Rat reqRatio = nOfReq / batchSize(request);
-      Rat requestCost = requestCost(request) * reqRatio;
-      Rat requestMemory = memory(request) * reqRatio;
-      Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
-
-      Fut<Unit> f = p!processRequest(sortedRequest);
-      processing = appendright(processing,f);
-    }
-
-    foreach(p in processing){
-      await p?;
-    }
-  }
-}
+// class ServiceEndpointObject(ServiceLoadBalancer lb) implements ServiceEndpoint {
+//
+//   Unit invokeService(Request request){
+//     Int batchSize = batchSize(request);
+//     Map<Pod,Int> scheduled = map[];
+//     List<Fut<Unit>> processing = list[];
+//
+//     scheduled = await lb!distributeRequest(request);
+//
+//     foreach (p in elements(keys(scheduled))) {
+//       // create sortedRequest multipling costs per ratio
+//       Int nOfReq = lookupDefault(scheduled, p, 0);
+//       Rat reqRatio = nOfReq / batchSize(request);
+//       Rat requestCost = requestCost(request) * reqRatio;
+//       Rat requestMemory = memory(request) * reqRatio;
+//       Request sortedRequest = Request(requestType(request), requestCost, requestMemory, nOfReq);
+//
+//       Fut<Unit> f = p!processRequest(sortedRequest);
+//       processing = appendright(processing,f);
+//     }
+//
+//     foreach(p in processing){
+//       await p?;
+//     }
+//   }
+// }
 
 //
 // LOADBALANCER POLICIES

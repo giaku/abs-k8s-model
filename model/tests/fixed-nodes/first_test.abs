@@ -8,49 +8,55 @@ import * from K8sClients;
 import * from ABS.DC;
 
 {
-  Int timeUnitSize = 2;
-  Int costGranularity = 100;
+  Int timeUnitSize = 2; // [NOT USED] equivalent in seconds of a time unit
+  Int costGranularity = 100; // Pods consume CPU for a request dividing the cost in this number of steps
 
+  // cluster elements instantiation
   CloudProvider cp = new CloudProvider("Cloud");
-  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity);
-  MasterLoadbalancer masterEndpoint = master.getEndpoint();
+  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity); // CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle, Int costGranularity
+                                                                         // loadPeriod: time unit granularity to compute loads on nodes
+                                                                         // resourceCycle: after how many time units the CPU is refreshed
+  MasterLoadbalancer masterEndpoint = master.getEndpoint(); // where to send the ClientRequest to
 
+  //
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE
+  //
+
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
   Map<String,Rat> a_wf1_50 = map[Pair("frontend",400),Pair("currencyservice",400),Pair("adservice",50),Pair("cartservice",50),Pair("productcatalogservice",80)];
   Map<String,Rat> a_wf1_100 = map[Pair("frontend",700),Pair("currencyservice",700),Pair("adservice",80),Pair("cartservice",70),Pair("productcatalogservice",140)];
   Map<String,Rat> a_wf1_200 = map[Pair("frontend",1200),Pair("currencyservice",1200),Pair("adservice",120),Pair("cartservice",110),Pair("productcatalogservice",250)];
   Map<String,Rat> a_wf1_300 = map[Pair("frontend",1700),Pair("currencyservice",1700),Pair("adservice",150),Pair("cartservice",140),Pair("productcatalogservice",300)];
 
-  Map<Int,Map<String,Rat>> a_wf1 = map[Pair(50,a_wf1_50),Pair(100,a_wf1_100),Pair(200,a_wf1_200),Pair(300,a_wf1_300)];
-
+  // WF2
   Map<String,Rat> a_wf2_50 = map[Pair("frontend",1000),Pair("currencyservice",250),Pair("adservice",40),Pair("cartservice",200)];
   Map<String,Rat> a_wf2_100 = map[Pair("frontend",1800),Pair("currencyservice",400),Pair("adservice",60),Pair("cartservice",350)];
   Map<String,Rat> a_wf2_200 = map[Pair("frontend",3000),Pair("currencyservice",600),Pair("adservice",80),Pair("cartservice",600)];
   Map<String,Rat> a_wf2_300 = map[Pair("frontend",4000),Pair("currencyservice",700),Pair("adservice",100),Pair("cartservice",800)];
 
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> a_wf1 = map[Pair(50,a_wf1_50),Pair(100,a_wf1_100),Pair(200,a_wf1_200),Pair(300,a_wf1_300)];
+
+  // WF2
   Map<Int,Map<String,Rat>> a_wf2 = map[Pair(50,a_wf2_50),Pair(100,a_wf2_100),Pair(200,a_wf2_200),Pair(300,a_wf2_300)];
 
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
   // <WF , <RPS , <SERVICE , millicores>>>
   Map<String,Map<Int,Map<String,Rat>>> typeA_calibrationMaps = map[Pair("wf1",a_wf1),Pair("wf2",a_wf2)];
 
-  // Map<String,Map<Int,Map<String,Rat>>> typeA_calibrationMaps = map[Pair("wf-1",
-  //                                                                       map[Pair(50,map[Pair("frontend",400),Pair("currencyservice",400),Pair("adservice",50),Pair("cartservice",50),Pair("productcatalogservice",80)]),
-  //                                                                           Pair(100,map[Pair("frontend",700),Pair("currencyservice",700),Pair("adservice",80),Pair("cartservice",70),Pair("productcatalogservice",140)]),
-  //                                                                           Pair(200,map[Pair("frontend",1200),Pair("currencyservice",1200),Pair("adservice",120),Pair("cartservice",110),Pair("productcatalogservice",250)]),
-  //                                                                           Pair(300,map[Pair("frontend",1700),Pair("currencyservice",1700),Pair("adservice",150),Pair("cartservice",140),Pair("productcatalogservice",300)]),
-  //                                                                          ]
-  //                                                                       ),
-  //                                                                       Pair("wf-2",
-  //                                                                             map[Pair(50,map[Pair("frontend",1000),Pair("currencyservice",250),Pair("adservice",40),Pair("cartservice",200)]),
-  //                                                                                 Pair(100,map[Pair("frontend",1800),Pair("currencyservice",400),Pair("adservice",60),Pair("cartservice",350)]),
-  //                                                                                 Pair(200,map[Pair("frontend",3000),Pair("currencyservice",600),Pair("adservice",80),Pair("cartservice",600)]),
-  //                                                                                 Pair(300,map[Pair("frontend",4000),Pair("currencyservice",700),Pair("adservice",100),Pair("cartservice",800)]),
-  //                                                                                ]
-  //                                                                       )
-  //                                                                 ];
+  // Create some nodes
+  Bool fb = master.createNodes(4,4000,4000,0,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
 
-  Bool fb = master.createNodes(4,4000,4000,0,typeA_calibrationMaps);
+  //
+  // SERVICES CREATION
+  //
 
+  // ServiceConfig: String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle,
+  //                Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod
   ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  // PodConfig: Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit, Int costGranularity
   PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
   ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig checkoutservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
@@ -73,6 +79,10 @@ import * from ABS.DC;
   ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 4, 4, 4, 1, 80/100, 5/100, 10);
   PodConfig adservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
 
+  // map containing the rules for pods scheduling. If specified for a service, every time the a new pod is deployed
+  // for that service, the pod will end up on the node specified by the rule.
+  // These lists are circular, once the end is reached the schedule will start over from the first element.
+  // The specified numbers in the lists are the Node-IDs.
   Map<String,List<Int>> rulesMap = map[];
   rulesMap = put(rulesMap,"frontend",list[1,2,3,4]);
   rulesMap = put(rulesMap,"currencyservice",list[1,2,3,4]);
@@ -82,32 +92,22 @@ import * from ABS.DC;
   rulesMap = put(rulesMap,"rediscart",list[1,2,3,4]);
   rulesMap = put(rulesMap,"recommendationservice",list[1,2,3,4]);
 
-  master.setSchedulerRulesMap(rulesMap);
+  master.setSchedulerRulesMap(rulesMap); // set it in in the master
 
-  ServiceLoadBalancerPolicy policy = new RoundRobinLbPolicy();
+  // Services instantiation
+  Service emailservice = new ServiceObject(emailserviceServiceConfig, emailservicePodConfig);
+  Service checkoutservice = new ServiceObject(checkoutserviceServiceConfig, checkoutservicePodConfig);
+  Service recommendationservice = new ServiceObject(recommendationserviceServiceConfig, recommendationservicePodConfig);
+  Service frontend = new ServiceObject(frontendServiceConfig, frontendPodConfig);
+  Service paymentservice = new ServiceObject(paymentserviceServiceConfig, paymentservicePodConfig);
+  Service productcatalogservice = new ServiceObject(productcatalogserviceServiceConfig, productcatalogservicePodConfig);
+  Service cartservice = new ServiceObject(cartserviceServiceConfig, cartservicePodConfig);
+  Service currencyservice = new ServiceObject(currencyserviceServiceConfig, currencyservicePodConfig);
+  Service shippingservice = new ServiceObject(shippingserviceServiceConfig, shippingservicePodConfig);
+  Service rediscart = new ServiceObject(rediscartServiceConfig, rediscartPodConfig);
+  Service adservice = new ServiceObject(adserviceServiceConfig, adservicePodConfig);
 
-  Service emailservice = new ServiceObject(emailserviceServiceConfig, emailservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service checkoutservice = new ServiceObject(checkoutserviceServiceConfig, checkoutservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service recommendationservice = new ServiceObject(recommendationserviceServiceConfig, recommendationservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service frontend = new ServiceObject(frontendServiceConfig, frontendPodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service paymentservice = new ServiceObject(paymentserviceServiceConfig, paymentservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service productcatalogservice = new ServiceObject(productcatalogserviceServiceConfig, productcatalogservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service cartservice = new ServiceObject(cartserviceServiceConfig, cartservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service currencyservice = new ServiceObject(currencyserviceServiceConfig, currencyservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service shippingservice = new ServiceObject(shippingserviceServiceConfig, shippingservicePodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service rediscart = new ServiceObject(rediscartServiceConfig, rediscartPodConfig, policy);
-  policy = new RoundRobinLbPolicy();
-  Service adservice = new ServiceObject(adserviceServiceConfig, adservicePodConfig, policy);
-
+  // Deploy the services
   List<Service> services = list[emailservice,checkoutservice,recommendationservice,frontend,paymentservice,
                                 productcatalogservice,cartservice,currencyservice,shippingservice,rediscart,
                                 adservice];
@@ -116,61 +116,23 @@ import * from ABS.DC;
     master.deployService(s);
   }
 
-  // WF1 30RPS
-  // Int batchSize1 = 30;
-  // Request request15 = Request("request_5", 146, 1, batchSize1);    // adservice
-  // Request request13 = Request("request_3", 96, 1, batchSize1);    // cartservice
-  // Request request12 = Request("request_2", 493, 1, batchSize1);   // currencyservice
-  // Request request11 = Request("request_1", 576, 1, batchSize1);   // frontend
-  // Request request14 = Request("request_4", 64, 1, batchSize1);    // productcatalog
-  // Request request16 = Request("request_6", 39, 1, batchSize1);    // recommendationservice
-  // Request request17 = Request("request_6", 31, 1, batchSize1);    // rediscart
-  //
-  // // WF2 70RPS
-  // Int batchSize2 = 70;
-  // Request request25 = Request("request_5", 188 - 110, 1, batchSize2);    // adservice
-  // Request request23 = Request("request_3", 179 - 29, 1, batchSize2);    // cartservice
-  // Request request22 = Request("request_2", 988 - 49, 1, batchSize2);   // currencyservice
-  // Request request21 = Request("request_1", 1324 - 44, 1, batchSize2);   // frontend
-  // Request request24 = Request("request_4", 115 - 28, 1, batchSize2);    // productcatalog
-  // Request request26 = Request("request_7", 45 - 40, 1, batchSize2);    // recommendationservice
-  // Request request27 = Request("request_6", 41 - 19, 1, batchSize2);    // rediscart
-  //
-  // ServiceTask frontendTask1 = new ServiceRequest(frontendEP,request11);
-  // ServiceTask currencyTask1 = new ServiceRequest(currencyserviceEP,request12);
-  // ServiceTask cartTask1 = new ServiceRequest(cartserviceEP,request13);
-  // ServiceTask productcatalogTask1 = new ServiceRequest(productcatalogserviceEP,request14);
-  // ServiceTask adTask1 = new ServiceRequest(adserviceEP,request15);
-  // ServiceTask recommendationTask1 = new ServiceRequest(recommendationserviceEP,request16);
-  // ServiceTask rediscartTask1 = new ServiceRequest(rediscartEP,request17);
-  //
-  // ServiceTask workflow1 = new ServiceWorkflow(Cons(list[frontendTask1,currencyTask1,cartTask1,productcatalogTask1,adTask1,recommendationTask1,rediscartTask1],Nil));
-  //
-  // ServiceTask frontendTask2 = new ServiceRequest(frontendEP,request21);
-  // ServiceTask currencyTask2 = new ServiceRequest(currencyserviceEP,request22);
-  // ServiceTask cartTask2 = new ServiceRequest(cartserviceEP,request23);
-  // ServiceTask productcatalogTask2 = new ServiceRequest(productcatalogserviceEP,request24);
-  // ServiceTask adTask2 = new ServiceRequest(adserviceEP,request25);
-  // ServiceTask recommendationTask2 = new ServiceRequest(recommendationserviceEP,request26);
-  // ServiceTask rediscartTask2 = new ServiceRequest(rediscartEP,request27);
-  //
-  // ServiceTask workflow2 = new ServiceWorkflow(Cons(list[frontendTask2,currencyTask2,cartTask2,productcatalogTask2,adTask2,recommendationTask2,rediscartTask2],Nil));
-
-  Printer printer = new PrinterObject2();
+  // set up the printer and pass the services to output
+  Printer printer = new PrinterObject2(); // PrinterObject: default printer, PrinterObject2: plot ready output
   List<Service> sList = list[frontend,currencyservice,cartservice,productcatalogservice,adservice,recommendationservice,rediscart];
+  printer!printStatus(master,sList,110,1); // master, services, numberOfCycles, cycleFrequency [time units]
 
-  printer!printStatus(master,sList,110,1);
-
+  // Create workflowsData
   WorkflowData wf1Data = WorkflowData("wf1",list["frontend","currencyservice","adservice","cartservice","productcatalogservice"]);
   WorkflowData wf2Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice"]);
 
+  // create ClientRequest (wfData,ReqSize)
   ClientRequest cr1 = ClientRequest(wf1Data,400);
   ClientRequest cr2 = ClientRequest(wf2Data,200);
 
   await duration(5,5);
 
   //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
-  Client c1 = new ClientObject(cr1,masterEndpoint,40,rat(1.0));
+  Client c1 = new ClientObject(cr1,masterEndpoint,80,rat(1.0));
   Client c2 = new ClientObject(cr2,masterEndpoint,50,rat(1.0));
 
   c2!start();
