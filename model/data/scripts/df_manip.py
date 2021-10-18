@@ -126,6 +126,23 @@ def dump2ColsIteration(dataframe):
 
     return p.DataFrame(l,columns=['value','pod','service','node','iteration'])
 
+def dump2ColsIterationWithTime(dataframe):
+    l = list()
+
+    for c in dataframe.items():
+        i = 0
+        for val in c[1]:
+            try:
+                v = float(val)
+                pod,service,node = getPodServiceNode(c[0])
+                r = (dataframe['Time'][i],v,pod,service,node,dataframe['iteration'][i])
+                l.append(r)
+            except:
+                pass
+            i = i + 1
+
+    return p.DataFrame(l,columns=['time','value','pod','service','node','iteration'])
+
 
 def getPodServiceNode(label):
     subls = label.split('_')
