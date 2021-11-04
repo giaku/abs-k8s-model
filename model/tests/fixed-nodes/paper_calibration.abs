@@ -145,7 +145,7 @@ import * from ABS.DC;
   // Create workflowsData
   WorkflowData wf1Data = WorkflowData("wf1",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
   WorkflowData wf2Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
-
+  WorkflowData wf3Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice", "recommendationservice","redis-cart"]);
   // create ClientRequest (wfData,ReqSize)
   ClientRequest cr1 = ClientRequest(wf1Data,400);
   ClientRequest cr2 = ClientRequest(wf2Data,200);
