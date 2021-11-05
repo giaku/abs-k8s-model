@@ -1,0 +1,162 @@
+module MicroservicesDemoTest1;
+
+import * from K8sService;
+import * from K8sMaster;
+import * from K8sUtil;
+import * from K8sWorkflow;
+import * from K8sClients;
+import * from ABS.DC;
+
+{
+  Int timeUnitSize = 2; // [NOT USED] equivalent in seconds of a time unit
+  Int costGranularity = 100; // Pods consume CPU for a request dividing the cost in this number of steps
+
+  // cluster elements instantiation
+  CloudProvider cp = new CloudProvider("Cloud");
+  Master master = new MasterObject(cp,timeUnitSize,1,1,costGranularity); // CloudProvider cp, Rat timeUnitSize, Int loadPeriod, Int resourceCycle, Int costGranularity
+                                                                         // loadPeriod: time unit granularity to compute loads on nodes
+                                                                         // resourceCycle: after how many time units the CPU is refreshed
+  MasterLoadbalancer masterEndpoint = master.getEndpoint(); // where to send the ClientRequest to
+
+  //
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE
+  //
+
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
+  Map<String,Rat> a_wf1_25 = map[Pair("frontend",526),Pair("currencyservice",434),Pair("adservice",72),Pair("cartservice",72),Pair("productcatalogservice",57),Pair("redis-cart",12)];
+  Map<String,Rat> a_wf1_50 = map[Pair("frontend",879),Pair("currencyservice",760),Pair("adservice",104),Pair("cartservice",129),Pair("productcatalogservice",94),Pair("redis-cart",18)];
+  Map<String,Rat> a_wf1_75 = map[Pair("frontend",1079),Pair("currencyservice",971),Pair("adservice",133),Pair("cartservice",169),Pair("productcatalogservice",129),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf1_100 = map[Pair("frontend",1223),Pair("currencyservice",1079),Pair("adservice",157),Pair("cartservice",196),Pair("productcatalogservice",156),Pair("redis-cart",25)];
+  Map<String,Rat> a_wf1_125 = map[Pair("frontend",1327),Pair("currencyservice",1195),Pair("adservice",171),Pair("cartservice",194),Pair("productcatalogservice",173),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf1_150 = map[Pair("frontend",1452),Pair("currencyservice",1268),Pair("adservice",172),Pair("cartservice",183),Pair("productcatalogservice",182),Pair("redis-cart",18)];
+  Map<String,Rat> a_wf1_175 = map[Pair("frontend",1560),Pair("currencyservice",1354),Pair("adservice",165),Pair("cartservice",166),Pair("productcatalogservice",176),Pair("redis-cart",14)];
+  Map<String,Rat> a_wf1_200 = map[Pair("frontend",1653),Pair("currencyservice",1470),Pair("adservice",146),Pair("cartservice",137),Pair("productcatalogservice",146),Pair("redis-cart",8)];
+
+  // WF2
+  Map<String,Rat> a_wf2_25 = map[Pair("frontend",558),Pair("currencyservice",436),Pair("adservice",72),Pair("cartservice",73),Pair("productcatalogservice",57),Pair("redis-cart",12)];
+  Map<String,Rat> a_wf2_50 = map[Pair("frontend",945),Pair("currencyservice",760),Pair("adservice",107),Pair("cartservice",126),Pair("productcatalogservice",93),Pair("redis-cart",18)];
+  Map<String,Rat> a_wf2_75 = map[Pair("frontend",1136),Pair("currencyservice",972),Pair("adservice",137),Pair("cartservice",167),Pair("productcatalogservice",126),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf2_100 = map[Pair("frontend",1288),Pair("currencyservice",1061),Pair("adservice",153),Pair("cartservice",185),Pair("productcatalogservice",151),Pair("redis-cart",24)];
+  Map<String,Rat> a_wf2_125 = map[Pair("frontend",1423),Pair("currencyservice",1123),Pair("adservice",170),Pair("cartservice",182),Pair("productcatalogservice",166),Pair("redis-cart",21)];
+  Map<String,Rat> a_wf2_150 = map[Pair("frontend",1544),Pair("currencyservice",1243),Pair("adservice",167),Pair("cartservice",158),Pair("productcatalogservice",164),Pair("redis-cart",15)];
+  Map<String,Rat> a_wf2_175 = map[Pair("frontend",1678),Pair("currencyservice",1350),Pair("adservice",148),Pair("cartservice",142),Pair("productcatalogservice",155),Pair("redis-cart",10)];
+  Map<String,Rat> a_wf2_200 = map[Pair("frontend",1723),Pair("currencyservice",1374),Pair("adservice",131),Pair("cartservice",129),Pair("productcatalogservice",143),Pair("redis-cart",8)];
+
+  // WF3
+  Map<String,Rat> a_wf3_25 = map[Pair("frontend",467),Pair("currencyservice",114),Pair("adservice",73),Pair("cartservice",73),Pair("productcatalogservice",276),Pair("recommendationservice",135),Pair("redis-cart",12)];
+  Map<String,Rat> a_wf3_50 = map[Pair("frontend",759),Pair("currencyservice",194),Pair("adservice",102),Pair("cartservice",131),Pair("productcatalogservice",438),Pair("recommendationservice",219),Pair("redis-cart",17)];
+  Map<String,Rat> a_wf3_75 = map[Pair("frontend",1024),Pair("currencyservice",271),Pair("adservice",138),Pair("cartservice",170),Pair("productcatalogservice",588),Pair("recommendationservice",314),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf3_100 = map[Pair("frontend",1121),Pair("currencyservice",319),Pair("adservice",158),Pair("cartservice",186),Pair("productcatalogservice",685),Pair("recommendationservice",381),Pair("redis-cart",24)];
+  Map<String,Rat> a_wf3_125 = map[Pair("frontend",1222),Pair("currencyservice",361),Pair("adservice",168),Pair("cartservice",191),Pair("productcatalogservice",726),Pair("recommendationservice",435),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf3_150 = map[Pair("frontend",1384),Pair("currencyservice",375),Pair("adservice",165),Pair("cartservice",165),Pair("productcatalogservice",815),Pair("recommendationservice",492),Pair("redis-cart",13)];
+  Map<String,Rat> a_wf3_175 = map[Pair("frontend",1436),Pair("currencyservice",347),Pair("adservice",151),Pair("cartservice",143),Pair("productcatalogservice",848),Pair("recommendationservice",494),Pair("redis-cart",8)];
+  Map<String,Rat> a_wf3_200 = map[Pair("frontend",1473),Pair("currencyservice",350),Pair("adservice",164),Pair("cartservice",139),Pair("productcatalogservice",872),Pair("recommendationservice",511),Pair("redis-cart",8)];
+
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> a_wf1 = map[Pair(25,a_wf1_25),Pair(50,a_wf1_50),Pair(75,a_wf1_75),Pair(100,a_wf1_100),Pair(125,a_wf1_125),Pair(150,a_wf1_150),Pair(175,a_wf1_175),Pair(200,a_wf1_200)];
+
+  // WF2
+  Map<Int,Map<String,Rat>> a_wf2 = map[Pair(25,a_wf2_25),Pair(50,a_wf2_50),Pair(75,a_wf2_75),Pair(100,a_wf2_100),Pair(125,a_wf2_125),Pair(150,a_wf2_150),Pair(175,a_wf2_175),Pair(200,a_wf2_200)];
+
+  // WF3
+  Map<Int,Map<String,Rat>> a_wf3 = map[Pair(25,a_wf3_25),Pair(50,a_wf3_50),Pair(75,a_wf3_75),Pair(100,a_wf3_100),Pair(125,a_wf3_125),Pair(150,a_wf3_150),Pair(175,a_wf3_175),Pair(200,a_wf3_200)];
+
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
+  // <WF , <RPS , <SERVICE , millicores>>>
+  Map<String,Map<Int,Map<String,Rat>>> typeA_calibrationMaps = map[Pair("wf1",a_wf1),Pair("wf2",a_wf2),Pair("wf3",a_wf3)];
+
+  // Create some nodes
+  Bool fb = master.createNodes(4,4000,4000,0,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
+
+  //
+  // SERVICES CREATION
+  //
+
+  // ServiceConfig: String name, Int startingPods, Int minPods, Int maxPods, Rat scalerCycle,
+  //                Rat upscaleThreshold, Rat downscaleThreshold, Int downscalePeriod
+  ServiceConfig emailserviceServiceConfig = ServiceConfig("emailservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  // PodConfig: Rat monitorCycle, Rat memoryCooldown, Rat cpuRequest, Rat cpuLimit, Int costGranularity
+  PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig checkoutservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig recommendationservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig frontendPodConfig = PodConfig(1, 0, 450, 3000, costGranularity);
+  ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig paymentservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
+  ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig productcatalogservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig cartservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
+  ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig currencyservicePodConfig = PodConfig(1, 0, 450, 500, costGranularity);
+  ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
+  PodConfig shippingservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
+  ServiceConfig rediscartServiceConfig = ServiceConfig("redis-cart", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig rediscartPodConfig = PodConfig(1, 0, 220, 325, costGranularity);
+  ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  PodConfig adservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
+
+  // map containing the rules for pods scheduling. If specified for a service, every time the a new pod is deployed
+  // for that service, the pod will end up on the node specified by the rule.
+  // These lists are circular, once the end is reached the schedule will start over from the first element.
+  // The specified numbers in the lists are the Node-IDs.
+  Map<String,List<Int>> rulesMap = map[];
+  rulesMap = put(rulesMap,"frontend",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"currencyservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"adservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"cartservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"productcatalogservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"redis-cart",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"recommendationservice",list[1,2,3,4]);
+
+  master.setSchedulerRulesMap(rulesMap); // set it in in the master
+
+  // Services instantiation
+  Service emailservice = new ServiceObject(emailserviceServiceConfig, emailservicePodConfig);
+  Service checkoutservice = new ServiceObject(checkoutserviceServiceConfig, checkoutservicePodConfig);
+  Service recommendationservice = new ServiceObject(recommendationserviceServiceConfig, recommendationservicePodConfig);
+  Service frontend = new ServiceObject(frontendServiceConfig, frontendPodConfig);
+  Service paymentservice = new ServiceObject(paymentserviceServiceConfig, paymentservicePodConfig);
+  Service productcatalogservice = new ServiceObject(productcatalogserviceServiceConfig, productcatalogservicePodConfig);
+  Service cartservice = new ServiceObject(cartserviceServiceConfig, cartservicePodConfig);
+  Service currencyservice = new ServiceObject(currencyserviceServiceConfig, currencyservicePodConfig);
+  Service shippingservice = new ServiceObject(shippingserviceServiceConfig, shippingservicePodConfig);
+  Service rediscart = new ServiceObject(rediscartServiceConfig, rediscartPodConfig);
+  Service adservice = new ServiceObject(adserviceServiceConfig, adservicePodConfig);
+
+  // Deploy the services
+  List<Service> services = list[emailservice,checkoutservice,recommendationservice,frontend,paymentservice,
+                                productcatalogservice,cartservice,currencyservice,shippingservice,rediscart,
+                                adservice];
+
+  foreach (s in services){
+    master.deployService(s);
+  }
+
+  // set up the printer and pass the services to output
+  Printer printer = new PrinterObject2(); // PrinterObject: default printer, PrinterObject2: plot ready output
+  List<Service> sList = list[frontend,currencyservice,cartservice,productcatalogservice,adservice,recommendationservice,rediscart];
+  printer!printStatus(master,sList,110,1); // master, services, numberOfCycles, cycleFrequency [time units]
+
+  // Create workflowsData
+  WorkflowData wf1Data = WorkflowData("wf1",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
+  WorkflowData wf2Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
+  WorkflowData wf3Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice", "recommendationservice","redis-cart"]);
+  // create ClientRequest (wfData,ReqSize)
+  ClientRequest cr1 = ClientRequest(wf1Data,100);
+  ClientRequest cr2 = ClientRequest(wf3Data,100);
+
+  await duration(5,5);
+
+  //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
+  Client c1 = new ClientObject(cr1,masterEndpoint,80,rat(1.0));
+  Client c2 = new ClientObject(cr2,masterEndpoint,50,rat(1.0));
+
+  c2!start();
+  c1!start();
+
+}
