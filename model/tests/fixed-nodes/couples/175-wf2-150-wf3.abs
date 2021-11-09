@@ -81,18 +81,18 @@ import * from ABS.DC;
   PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
   ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig checkoutservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
-  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 4, 4, 4, 1, 80/100, 5/100, 10);
-  PodConfig recommendationservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig recommendationservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
   ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 8, 8, 8, 1, 80/100, 5/100, 10);
-  PodConfig frontendPodConfig = PodConfig(1, 0, 450, 3000, costGranularity);
+  PodConfig frontendPodConfig = PodConfig(1, 0, 250, 3000, costGranularity);
   ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig paymentservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
-  ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 4, 4, 4, 1, 80/100, 5/100, 10);
-  PodConfig productcatalogservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
+  ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 8, 8, 8, 1, 80/100, 5/100, 10);
+  PodConfig productcatalogservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
   ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 4, 4, 4, 1, 80/100, 5/100, 10);
-  PodConfig cartservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
+  PodConfig cartservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
   ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 8, 8, 8, 1, 80/100, 5/100, 10);
-  PodConfig currencyservicePodConfig = PodConfig(1, 0, 450, 500, costGranularity);
+  PodConfig currencyservicePodConfig = PodConfig(1, 0, 250, 2000, costGranularity);
   ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig shippingservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
   ServiceConfig rediscartServiceConfig = ServiceConfig("redis-cart", 4, 4, 4, 1, 80/100, 5/100, 10);
@@ -145,7 +145,7 @@ import * from ABS.DC;
   // Create workflowsData
   WorkflowData wf1Data = WorkflowData("wf1",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
   WorkflowData wf2Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice","redis-cart"]);
-  WorkflowData wf3Data = WorkflowData("wf2",list["frontend","currencyservice","adservice","cartservice","productcatalogservice", "recommendationservice","redis-cart"]);
+  WorkflowData wf3Data = WorkflowData("wf3",list["frontend","currencyservice","adservice","cartservice","productcatalogservice", "recommendationservice","redis-cart"]);
   // create ClientRequest (wfData,ReqSize)
   ClientRequest cr1 = ClientRequest(wf2Data,175);
   ClientRequest cr2 = ClientRequest(wf3Data,150);
@@ -154,7 +154,7 @@ import * from ABS.DC;
 
   //ClientWorkflow(ServiceTask t,Int times,Rat delay,Int timesGranularity)
   Client c1 = new ClientObject(cr1,masterEndpoint,80,rat(1.0));
-  Client c2 = new ClientObject(cr2,masterEndpoint,50,rat(1.0));
+  Client c2 = new ClientObject(cr2,masterEndpoint,80,rat(1.0));
 
   c2!start();
   c1!start();

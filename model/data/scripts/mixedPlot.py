@@ -5,6 +5,7 @@ Created on Fri May 14 10:52:24 2021
 @author: Utente
 """
 import sys
+import os
 import df_manip as dfm
 # import dfPlots as dfp
 # import pandas as pnd
@@ -19,14 +20,14 @@ def readAndFormatCsvs(folder):
     df = csvr.readCsvsDf(folder)
     df = dfm.dump2ColsIteration(df)
     #df['value'] = df['value'].apply(lambda x:x*1000)
-    
+
     return df
 
 def readAndFormatCsvsWithTime(folder):
     df = csvr.readCsvsDf(folder)
     df = dfm.dump2ColsIterationWithTime(df)
     #df['value'] = df['value'].apply(lambda x:x*1000)
-    
+
     return df
 
 
@@ -36,7 +37,7 @@ def plotDf(df, folder):
     g.set(xlabel='Average Load (Millicores)')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\serviceLoads.svg', format='svg')
+    plt.savefig(folder + os.path.sep +'serviceLoads.svg', format='svg')
 
 
 def podAvgConsumptions(df):
@@ -47,7 +48,7 @@ def podAvgConsumptions(df):
       'service': 'first'
       }
     )
-    
+
     return df
 
 
@@ -57,7 +58,7 @@ def servicesConsumption(df, folder):
       'millicores': 'sum',
       }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     fig.add_axes(ax)
@@ -68,7 +69,7 @@ def servicesConsumption(df, folder):
     g.set(xlabel='Average Load (Millicores)', ylabel='Service')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\serviceLoads.svg', format='svg')
+    plt.savefig(folder + os.path.sep + 'serviceLoads.svg', format='svg')
 
 def servicesConsumption2(df, folder):
     df = df.groupby(['service','source','iteration'], as_index=False).agg(
@@ -76,7 +77,7 @@ def servicesConsumption2(df, folder):
       'millicores': 'sum',
       }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     fig.add_axes(ax)
@@ -87,15 +88,15 @@ def servicesConsumption2(df, folder):
     g.set(xlabel='Average Load (Millicores)', ylabel='Service')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\serviceLoads.svg', format='svg')
-    
+    plt.savefig(folder + os.path.sep + 'serviceLoads.svg', format='svg')
+
 def servicesConsumptionTime(df, folder):
     df = df.groupby(['time','service'], as_index=False).agg(
     {
       'millicores': 'sum',
       }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     ax.tick_params(axis='x', rotation=90)
@@ -107,17 +108,17 @@ def servicesConsumptionTime(df, folder):
     g.set(xlabel='Average Load (Millicores)', ylabel='Service')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\serviceLoads.svg', format='svg')
-    
+    plt.savefig(folder + os.path.sep + 'serviceLoads.svg', format='svg')
+
 def servicesConsumptionTime2(df, folder):
     df = df.groupby(['time','service','node'], as_index=False).agg(
     {
       'millicores': 'sum',
       }
     )
-    
+
     multipleLineplotsOverColValue(df,'node',folder)
-    g.savefig(folder + '\\multiPlot.svg', format='svg')
+    g.savefig(folder + os.path.sep + 'multiPlot.svg', format='svg')
 
 def nodeLoads(df, folder):
     df = df.groupby(['node','iteration'], as_index=False).agg(
@@ -126,7 +127,7 @@ def nodeLoads(df, folder):
      'source': 'first',
      }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     ax.set(xlim=[0,4000])
@@ -138,7 +139,7 @@ def nodeLoads(df, folder):
     g.set(xlabel='Average Load (Millicores)', ylabel='Node')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\nodeLoads.svg', format='svg')
+    plt.savefig(folder + os.path.sep + 'nodeLoads.svg', format='svg')
 
 def nodeLoads2(df, folder):
     df = df.groupby(['source','node','iteration'], as_index=False).agg(
@@ -147,7 +148,7 @@ def nodeLoads2(df, folder):
      'source': 'first',
      }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     ax.set(xlim=[0,4000])
@@ -159,13 +160,13 @@ def nodeLoads2(df, folder):
     g.set(xlabel='Average Load (Millicores)', ylabel='Node')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\nodeLoads.svg', format='svg')
-    
+    plt.savefig(folder + os.path.sep + 'nodeLoads.svg', format='svg')
+
 def multipleLineplotsOverColValue(df, col_name, folder):
-    
+
     sns.set_style("whitegrid")
     g = sns.FacetGrid(df, row="node", hue='service', height=4, aspect=4)
-    g.map(sns.lineplot, "time", "millicores")        
+    g.map(sns.lineplot, "time", "millicores")
     g.set_axis_labels('Time','Load [Millicores]')
     g.set_xticklabels(rotation=90)
     g.add_legend()
@@ -181,7 +182,7 @@ def nodeLoadsTime(df, folder):
      'source': 'first',
      }
     )
-    
+
     fig = plt.figure(figsize=(9.6,6))
     ax = plt.axes()
     ax.tick_params(axis='x', rotation=90)
@@ -194,59 +195,59 @@ def nodeLoadsTime(df, folder):
     g.set(xlabel='Time', ylabel='Load [Millicores]')
 
     plt.tight_layout()
-    plt.savefig(folder + '\\nodeLoads.svg', format='svg')
+    plt.savefig(folder + os.path.sep + 'nodeLoads.svg', format='svg')
 
 def genDf(folder):
-    model = outp.PodReport.prListToDf(outp.podReports(folder + '\\model.txt'))
+    model = outp.PodReport.prListToDf(outp.podReports(folder + os.path.sep + 'model.txt'))
     model['iteration'] = -1
 
     test = readAndFormatCsvs(folder)
-    
+
     res = dfm.mergeModel(test, model)
     res = dfm.mapNodes(res)
     res = podAvgConsumptions(res)
-    
+
     return res
 
 def genDfNoModel(folder):
     test = readAndFormatCsvs(folder)
-    
+
     res = dfm.mergeDfs(None, test)
     res = dfm.mapNodes(res)
     res = podAvgConsumptions(res)
-    
+
     return res
 
 def genDfNoModelWithTime(folder):
     test = readAndFormatCsvsWithTime(folder)
-    
+
     res = dfm.mergeDfs(None, test)
     res = dfm.mapNodes(res)
     #res = podAvgConsumptions(res)
-    
+
     return res
 
 def run(folder):
     mpl.use('WebAgg')
-        
+
     df = genDf(folder)
-    
+
     nodeLoads2(df, folder)
     servicesConsumption2(df, folder)
-    
+
 def run_noMod(folder):
     mpl.use('WebAgg')
-        
+
     df = genDfNoModel(folder)
-    
+
     nodeLoads(df, folder)
     servicesConsumption(df, folder)
-    
+
 def run_plotTest(folder):
     mpl.use('WebAgg')
-        
+
     df = genDfNoModelWithTime(folder)
-    
+
     nodeLoadsTime(df, folder)
     servicesConsumptionTime2(df, folder)
 
@@ -256,17 +257,8 @@ if __name__ == '__main__':
     else:
         raise Exception('Specify an input folder')
     mpl.use('WebAgg')
-        
+
     df = genDf(folder)
-    
+
     nodeLoads2(df, folder)
     servicesConsumption2(df, folder)
-
-
-
-
-
-
-
-
-

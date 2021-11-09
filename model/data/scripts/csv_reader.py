@@ -13,15 +13,15 @@ def readCsv(filePath):
     """
     Takes a .csv file with a first line with headers and returns a dictionary containing the columns of the file
     as lists identified by the header of the column.
-    
+
     ex: "a","b","c"
         x1, y1, z1
         x2, y2, z2
         ...
         xn, yn, zn
-        
+
         =>
-        
+
         { a : [x1,..,xn] , b : [y1,..,yn] , c : [z1,..,zn]}
 
     Parameters
@@ -38,33 +38,33 @@ def readCsv(filePath):
 
     """
     result = dict()
-    
+
     f = open(filePath)
-    
+
     header = f.readline().replace('"','')
     headers = header.split(',')
     length = len(headers)
     for h in headers:
         result.update({h : list()})
-        
+
     lists = list()
     for i in range(length):
         lists.append(list())
-        
+
     lines = f.readlines()
     for l in lines:
         values = l.split(',')
         if (len(values) == len(headers)):
             for i in range(len(headers)):
                 lists[i].append(values[i])
-            
+
     for i in range(length):
         result.update({headers[i] : lists[i]})
-        
+
     f.close()
-        
+
     return result
- 
+
 
 def readCsvs(directory):
     """
@@ -83,14 +83,14 @@ def readCsvs(directory):
     """
     result = list()
     #print(os.listdir(directory))
-    
+
     for fileName in os.listdir(directory):
         if fileName.endswith('csv'):
             try:
-                val = readCsv(directory + '\\' + fileName)
+                val = readCsv(directory + os.path.sep + fileName)
                 result.append(val)
             except:
-                pass            
+                pass
 
     return result
 
@@ -110,11 +110,11 @@ def readCsvsDf(directory):
     """
     l = list()
     #print(os.listdir(directory))
-    
+
     for fileName in os.listdir(directory):
         if fileName.endswith('csv'):
             try:
-                val = readCsv(directory + '\\' + fileName)
+                val = readCsv(directory + os.path.sep + fileName)
                 l.append(val)
             except:
                 pass
@@ -122,15 +122,15 @@ def readCsvsDf(directory):
     ldf = list()
     for d in l:
         ldf.append(p.DataFrame(d))
-        
+
     result = p.concat(ldf, keys=range(len(ldf))).reset_index()
-    
+
     result = result.drop(columns=['level_1'])
-    result = result.rename(columns={'level_0':'iteration'})       
+    result = result.rename(columns={'level_0':'iteration'})
 
     return result
 
-       
+
 def averageValues(csvDict):
     """
     Takes a dict obtained by a csv file and computes the average value for each column,
@@ -148,7 +148,7 @@ def averageValues(csvDict):
 
     """
     result = dict()
-    
+
     for k in csvDict.keys():
         vals = csvDict.get(k)
         numeric = list()
@@ -166,13 +166,13 @@ def averageValues(csvDict):
             avg = total / c
         else:
             avg = 'none'
-           
+
         stdev = 'none'
         if len(numeric) >= 2:
             stdev = stat.stdev(numeric)
-            
+
         result.update({k : (avg,stdev,c)})
-        
+
     return result
 
 
@@ -192,7 +192,7 @@ def mergeAvgs(avgs):
 
     """
     result = dict()
-    
+
     for avg in avgs:
         for k in avg.keys():
             xs = avg.get(k)[0]
@@ -201,7 +201,7 @@ def mergeAvgs(avgs):
                 rs = list()
             rs.append(xs)
             result.update({ k : rs })
-        
+
     return result
 
 
@@ -222,15 +222,15 @@ def directoryAvgs(directory):
     """
     csvList =  readCsvs(directory)
     avgList = list()
-    
+
     for d in csvList:
         d = averageValues(d)
         avgList.append(d)
-        
+
     result = averageValues(mergeAvgs(avgList))
-    
+
     return result
-    
+
 
 
 def outputAvg(avgs):
@@ -249,32 +249,23 @@ def outputAvg(avgs):
 
     """
     result = ''
-    
+
     for k in avgs.keys():
         label = k.strip('\n')
         avg = avgs.get(k)[0]
         stdev = avgs.get(k)[1]
         samples = avgs.get(k)[2]
-        
+
         valid = False
-    
+
         if isinstance(avg,float):
             avg = '{:.3f}'.format(avg)
             valid = True
         if isinstance(stdev,float):
             stdev = '{:.5f}'.format(stdev)
             valid = True
-            
+
         if valid:
             result = result + '{0:<35} | avg: {1:>8} | stdev: {2:>10} | samples: {3:>4}\n'.format(label,str(avg),str(stdev),str(samples))
-        
+
     return result
-
-
-
-
-
-
-
-
-            

@@ -13,17 +13,17 @@ def runAll(paths):
     for path in paths:
         for fld in os.listdir(path):
             try:
-                mxp.run(path + '\\' + fld)
+                mxp.run(path + os.path.sep + fld)
             except:
-                print('error running on: '  + path + '\\' + fld)
-                
+                print('error running on: '  + path + os.path.sep + fld)
+
 def runNew(paths):
     # paths = ['..\\md\\mixed_wf_2nd_scheduling']
     executed = ''
     for path in paths:
         for fld in os.listdir(path):
             try:
-                pth = path + '\\' + fld
+                pth = path + os.path.sep + fld
                 files = os.listdir(pth)
                 svg = False
                 for f in files:
@@ -34,10 +34,10 @@ def runNew(paths):
                         mxp.run(pth)
                         executed = executed + pth + '\n'
                     except:
-                        print('error running on: '  + path + '\\' + fld)
+                        print('error running on: '  + path + os.path.sep + fld)
             except:
                 pass
-    
+
     print('Executed: \n' + executed)
 
 if len(sys.argv) > 2:
@@ -49,5 +49,3 @@ elif len(sys.argv) == 2:
     runNew([sys.argv[1]])
 else:
     raise Exception('Specify a folder path')
-    
-
