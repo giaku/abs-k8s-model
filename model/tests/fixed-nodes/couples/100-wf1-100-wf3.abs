@@ -19,7 +19,7 @@ import * from ABS.DC;
   MasterLoadbalancer masterEndpoint = master.getEndpoint(); // where to send the ClientRequest to
 
   //
-  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE A
   //
 
   // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
@@ -66,6 +66,94 @@ import * from ABS.DC;
   // Full calibration map for a node type, associates every workflow with its 2nd level map
   // <WF , <RPS , <SERVICE , millicores>>>
   Map<String,Map<Int,Map<String,Rat>>> typeA_calibrationMaps = map[Pair("wf1",a_wf1),Pair("wf2",a_wf2),Pair("wf3",a_wf3)];
+
+
+  //
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE B
+  //
+
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
+  Map<String,Rat> b_wf1_25 = map[Pair("frontend",487),Pair("currencyservice",412),Pair("productcatalogservice",45)];
+  Map<String,Rat> b_wf1_50 = map[Pair("frontend",896),Pair("currencyservice",751),Pair("productcatalogservice",80)];
+  Map<String,Rat> b_wf1_75 = map[Pair("frontend",1266),Pair("currencyservice",1051),Pair("productcatalogservice",113)];
+  Map<String,Rat> b_wf1_100 = map[Pair("frontend",1472),Pair("currencyservice",1245),Pair("productcatalogservice",140)];
+  Map<String,Rat> b_wf1_125 = map[Pair("frontend",1588),Pair("currencyservice",1399),Pair("productcatalogservice",160)];
+  Map<String,Rat> b_wf1_150 = map[Pair("frontend",1698),Pair("currencyservice",1489),Pair("productcatalogservice",179)];
+
+  // WF2
+  Map<String,Rat> b_wf2_25 = map[Pair("frontend",516),Pair("currencyservice",416),Pair("productcatalogservice",45)];
+  Map<String,Rat> b_wf2_50 = map[Pair("frontend",937),Pair("currencyservice",751),Pair("productcatalogservice",79)];
+  Map<String,Rat> b_wf2_75 = map[Pair("frontend",1344),Pair("currencyservice",1058),Pair("productcatalogservice",114)];
+  Map<String,Rat> b_wf2_100 = map[Pair("frontend",1545),Pair("currencyservice",1236),Pair("productcatalogservice",138)];
+  Map<String,Rat> b_wf2_125 = map[Pair("frontend",1689),Pair("currencyservice",1383),Pair("productcatalogservice",160)];
+  Map<String,Rat> b_wf2_150 = map[Pair("frontend",1769),Pair("currencyservice",1448),Pair("productcatalogservice",172)];
+
+  // WF3
+  Map<String,Rat> b_wf3_25 = map[Pair("frontend",486),Pair("currencyservice",129),Pair("productcatalogservice",262),Pair("recommendationservice",125)];
+  Map<String,Rat> b_wf3_50 = map[Pair("frontend",853),Pair("currencyservice",205),Pair("productcatalogservice",441),Pair("recommendationservice",211)];
+  Map<String,Rat> b_wf3_75 = map[Pair("frontend",1176),Pair("currencyservice",288),Pair("productcatalogservice",574),Pair("recommendationservice",305)];
+  Map<String,Rat> b_wf3_100 = map[Pair("frontend",1360),Pair("currencyservice",348),Pair("productcatalogservice",651),Pair("recommendationservice",364)];
+  Map<String,Rat> b_wf3_125 = map[Pair("frontend",1526),Pair("currencyservice",423),Pair("productcatalogservice",691),Pair("recommendationservice",421)];
+  Map<String,Rat> b_wf3_150 = map[Pair("frontend",1566),Pair("currencyservice",460),Pair("productcatalogservice",698),Pair("recommendationservice",433)];
+
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> b_wf1 = map[Pair(25,b_wf1_25),Pair(50,b_wf1_50),Pair(75,b_wf1_75),Pair(100,b_wf1_100),Pair(125,b_wf1_125),Pair(150,b_wf1_150)];
+
+  // WF2
+  Map<Int,Map<String,Rat>> b_wf2 = map[Pair(25,b_wf2_25),Pair(50,b_wf2_50),Pair(75,b_wf2_75),Pair(100,b_wf2_100),Pair(125,b_wf2_125),Pair(150,b_wf2_150)];
+
+  // WF3
+  Map<Int,Map<String,Rat>> b_wf3 = map[Pair(25,b_wf3_25),Pair(50,b_wf3_50),Pair(75,b_wf3_75),Pair(100,b_wf3_100),Pair(125,b_wf3_125),Pair(150,b_wf3_150)];
+
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
+  // <WF , <RPS , <SERVICE , millicores>>>
+  Map<String,Map<Int,Map<String,Rat>>> typeB_calibrationMaps = map[Pair("wf1",b_wf1),Pair("wf2",b_wf2),Pair("wf3",b_wf3)];
+
+  //
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE C
+  //
+
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
+  Map<String,Rat> c_wf1_25 = map[Pair("frontend",494),Pair("currencyservice",412),Pair("productcatalogservice",52)];
+  Map<String,Rat> c_wf1_50 = map[Pair("frontend",911),Pair("currencyservice",744),Pair("productcatalogservice",88)];
+  Map<String,Rat> c_wf1_75 = map[Pair("frontend",1220),Pair("currencyservice",1001),Pair("productcatalogservice",120)];
+  Map<String,Rat> c_wf1_100 = map[Pair("frontend",1411),Pair("currencyservice",1163),Pair("productcatalogservice",154)];
+  Map<String,Rat> c_wf1_125 = map[Pair("frontend",1565),Pair("currencyservice",1311),Pair("productcatalogservice",181)];
+  Map<String,Rat> c_wf1_150 = map[Pair("frontend",1634),Pair("currencyservice",1382),Pair("productcatalogservice",201)];
+
+  // WF2
+  Map<String,Rat> c_wf2_25 = map[Pair("frontend",512),Pair("currencyservice",399),Pair("productcatalogservice",51)];
+  Map<String,Rat> c_wf2_50 = map[Pair("frontend",1011),Pair("currencyservice",776),Pair("productcatalogservice",93)];
+  Map<String,Rat> c_wf2_75 = map[Pair("frontend",1318),Pair("currencyservice",1027),Pair("productcatalogservice",126)];
+  Map<String,Rat> c_wf2_100 = map[Pair("frontend",1495),Pair("currencyservice",1189),Pair("productcatalogservice",158)];
+  Map<String,Rat> c_wf2_125 = map[Pair("frontend",1633),Pair("currencyservice",1247),Pair("productcatalogservice",180)];
+  Map<String,Rat> c_wf2_150 = map[Pair("frontend",1734),Pair("currencyservice",1352),Pair("productcatalogservice",193)];
+
+  // WF3
+  Map<String,Rat> c_wf3_25 = map[Pair("frontend",487),Pair("currencyservice",116),Pair("productcatalogservice",280),Pair("recommendationservice",150)];
+  Map<String,Rat> c_wf3_50 = map[Pair("frontend",874),Pair("currencyservice",202),Pair("productcatalogservice",482),Pair("recommendationservice",251)];
+  Map<String,Rat> c_wf3_75 = map[Pair("frontend",1167),Pair("currencyservice",292),Pair("productcatalogservice",651),Pair("recommendationservice",361)];
+  Map<String,Rat> c_wf3_100 = map[Pair("frontend",1337),Pair("currencyservice",339),Pair("productcatalogservice",733),Pair("recommendationservice",422)];
+  Map<String,Rat> c_wf3_125 = map[Pair("frontend",1411),Pair("currencyservice",381),Pair("productcatalogservice",773),Pair("recommendationservice",480)];
+  Map<String,Rat> c_wf3_150 = map[Pair("frontend",1425),Pair("currencyservice",395),Pair("productcatalogservice",798),Pair("recommendationservice",511)];
+
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> c_wf1 = map[Pair(25,c_wf1_25),Pair(50,c_wf1_50),Pair(75,c_wf1_75),Pair(100,c_wf1_100),Pair(125,c_wf1_125),Pair(150,c_wf1_150)];
+
+  // WF2
+  Map<Int,Map<String,Rat>> c_wf2 = map[Pair(25,c_wf2_25),Pair(50,c_wf2_50),Pair(75,c_wf2_75),Pair(100,c_wf2_100),Pair(125,c_wf2_125),Pair(150,c_wf2_150)];
+
+  // WF3
+  Map<Int,Map<String,Rat>> c_wf3 = map[Pair(25,c_wf3_25),Pair(50,c_wf3_50),Pair(75,c_wf3_75),Pair(100,c_wf3_100),Pair(125,c_wf3_125),Pair(150,c_wf3_150)];
+
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
+  // <WF , <RPS , <SERVICE , millicores>>>
+  Map<String,Map<Int,Map<String,Rat>>> typeC_calibrationMaps = map[Pair("wf1",c_wf1),Pair("wf2",c_wf2),Pair("wf3",c_wf3)];
+
 
   // Create some nodes
   Bool fb = master.createNodes(4,4000,4000,0,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
