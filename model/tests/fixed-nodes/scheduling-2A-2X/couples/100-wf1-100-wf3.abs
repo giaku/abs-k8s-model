@@ -194,6 +194,67 @@ import * from ABS.DC;
   // <WF , <RPS , <SERVICE , millicores>>>
   Map<String,Map<Int,Map<String,Rat>>> typeX_calibrationMaps = map[Pair("wf1",x_wf1),Pair("wf2",x_wf2),Pair("wf3",x_wf3)];
 
+  //
+  // NODE TYPE D
+  //
+
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
+  Map<String,Rat> d_wf1_25 = map[Pair("frontend",568),Pair("adservice",72),Pair("cartservice",73),Pair("productcatalogservice",70),Pair("redis-cart",15)];
+  //Map<String,Rat> d_wf1_25 = map[Pair("frontend",217),Pair("adservice",42),Pair("cartservice",36),Pair("productcatalogservice",30),Pair("redis-cart",6)];
+  Map<String,Rat> d_wf1_50 = map[Pair("frontend",928),Pair("adservice",96),Pair("cartservice",114),Pair("productcatalogservice",98),Pair("redis-cart",19)];
+  //Map<String,Rat> d_wf1_50 = map[Pair("frontend",338),Pair("adservice",47),Pair("cartservice",54),Pair("productcatalogservice",37),Pair("redis-cart",7)];
+  Map<String,Rat> d_wf1_75 = map[Pair("frontend",1159),Pair("adservice",118),Pair("cartservice",157),Pair("productcatalogservice",129),Pair("redis-cart",22)];
+  //Map<String,Rat> d_wf1_75 = map[Pair("frontend",401),Pair("adservice",53),Pair("cartservice",76),Pair("productcatalogservice",47),Pair("redis-cart",8)];
+  Map<String,Rat> d_wf1_100 = map[Pair("frontend",1343),Pair("adservice",135),Pair("cartservice",181),Pair("productcatalogservice",149),Pair("redis-cart",26)];
+  //Map<String,Rat> d_wf1_100 = map[Pair("frontend",429),Pair("adservice",58),Pair("cartservice",84),Pair("productcatalogservice",54),Pair("redis-cart",9)];
+  Map<String,Rat> d_wf1_125 = map[Pair("frontend",1509),Pair("adservice",155),Pair("cartservice",214),Pair("productcatalogservice",177),Pair("redis-cart",29)];
+  //Map<String,Rat> d_wf1_125 = map[Pair("frontend",470),Pair("adservice",65),Pair("cartservice",96),Pair("productcatalogservice",62),Pair("redis-cart",9)];
+  Map<String,Rat> d_wf1_150 = map[Pair("frontend",1606),Pair("adservice",174),Pair("cartservice",230),Pair("productcatalogservice",199),Pair("redis-cart",30)];
+  //Map<String,Rat> d_wf1_150 = map[Pair("frontend",467),Pair("adservice",71),Pair("cartservice",103),Pair("productcatalogservice",68),Pair("redis-cart",10)];
+
+  // WF2
+  Map<String,Rat> d_wf2_25 = map[Pair("frontend",590),Pair("adservice",71),Pair("cartservice",71),Pair("productcatalogservice",67),Pair("redis-cart",14)];
+  //Map<String,Rat> d_wf2_25 = map[Pair("frontend",224),Pair("adservice",41),Pair("cartservice",34),Pair("productcatalogservice",28),Pair("redis-cart",6)];
+  Map<String,Rat> d_wf2_50 = map[Pair("frontend",957),Pair("adservice",96),Pair("cartservice",112),Pair("productcatalogservice",98),Pair("redis-cart",19)];
+  //Map<String,Rat> d_wf2_50 = map[Pair("frontend",344),Pair("adservice",47),Pair("cartservice",55),Pair("productcatalogservice",38),Pair("redis-cart",7)];
+  Map<String,Rat> d_wf2_75 = map[Pair("frontend",1198),Pair("adservice",112),Pair("cartservice",145),Pair("productcatalogservice",125),Pair("redis-cart",22)];
+  //Map<String,Rat> d_wf2_75 = map[Pair("frontend",418),Pair("adservice",51),Pair("cartservice",69),Pair("productcatalogservice",45),Pair("redis-cart",8)];
+  Map<String,Rat> d_wf2_100 = map[Pair("frontend",1396),Pair("adservice",136),Pair("cartservice",175),Pair("productcatalogservice",149),Pair("redis-cart",25)];
+  //Map<String,Rat> d_wf2_100 = map[Pair("frontend",461),Pair("adservice",59),Pair("cartservice",83),Pair("productcatalogservice",53),Pair("redis-cart",9)];
+  Map<String,Rat> d_wf2_125 = map[Pair("frontend",1561),Pair("adservice",157),Pair("cartservice",206),Pair("productcatalogservice",177),Pair("redis-cart",28)];
+  //Map<String,Rat> d_wf2_125 = map[Pair("frontend",482),Pair("adservice",65),Pair("cartservice",92),Pair("productcatalogservice",61),Pair("redis-cart",9)];
+  Map<String,Rat> d_wf2_150 = map[Pair("frontend",1722),Pair("adservice",174),Pair("cartservice",219),Pair("productcatalogservice",195),Pair("redis-cart",29)];
+  //Map<String,Rat> d_wf2_150 = map[Pair("frontend",506),Pair("adservice",69),Pair("cartservice",69),Pair("productcatalogservice",67),Pair("redis-cart",9)];
+
+  // WF3
+  Map<String,Rat> d_wf3_25 = map[Pair("frontend",463),Pair("adservice",83),Pair("cartservice",68),Pair("productcatalogservice",273),Pair("recommendationservice",143),Pair("redis-cart",14)];
+  //Map<String,Rat> d_wf3_25 = map[Pair("frontend",173),Pair("adservice",55),Pair("cartservice",35),Pair("productcatalogservice",99),Pair("recommendationservice",84),Pair("redis-cart",6)];
+  Map<String,Rat> d_wf3_50 = map[Pair("frontend",721),Pair("adservice",86),Pair("cartservice",106),Pair("productcatalogservice",425),Pair("recommendationservice",210),Pair("redis-cart",17)];
+  //Map<String,Rat> d_wf3_50 = map[Pair("frontend",252),Pair("adservice",43),Pair("cartservice",51),Pair("productcatalogservice",142),Pair("recommendationservice",117),Pair("redis-cart",7)];
+  Map<String,Rat> d_wf3_75 = map[Pair("frontend",932),Pair("adservice",114),Pair("cartservice",143),Pair("productcatalogservice",569),Pair("recommendationservice",286),Pair("redis-cart",21)];
+  //Map<String,Rat> d_wf3_75 = map[Pair("frontend",315),Pair("adservice",53),Pair("cartservice",67),Pair("productcatalogservice",180),Pair("recommendationservice",157),Pair("redis-cart",8)];
+  Map<String,Rat> d_wf3_100 = map[Pair("frontend",1119),Pair("adservice",135),Pair("cartservice",172),Pair("productcatalogservice",677),Pair("recommendationservice",349),Pair("redis-cart",23)];
+  //Map<String,Rat> d_wf3_100 = map[Pair("frontend",351),Pair("adservice",59),Pair("cartservice",78),Pair("productcatalogservice",208),Pair("recommendationservice",189),Pair("redis-cart",8)];
+  Map<String,Rat> d_wf3_125 = map[Pair("frontend",1239),Pair("adservice",146),Pair("cartservice",187),Pair("productcatalogservice",776),Pair("recommendationservice",409),Pair("redis-cart",25)];
+  //Map<String,Rat> d_wf3_125 = map[Pair("frontend",360),Pair("adservice",63),Pair("cartservice",82),Pair("productcatalogservice",227),Pair("recommendationservice",220),Pair("redis-cart",8)];
+  Map<String,Rat> d_wf3_150 = map[Pair("frontend",1292),Pair("adservice",168),Pair("cartservice",196),Pair("productcatalogservice",832),Pair("recommendationservice",466),Pair("redis-cart",25)];
+  //Map<String,Rat> d_wf3_150 = map[Pair("frontend",363),Pair("adservice",69),Pair("cartservice",81),Pair("productcatalogservice",233),Pair("recommendationservice",252),Pair("redis-cart",8)];
+
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> d_wf1 = map[Pair(25,d_wf1_25),Pair(50,d_wf1_50),Pair(75,d_wf1_75),Pair(100,d_wf1_100),Pair(125,d_wf1_125),Pair(150,d_wf1_150)];
+
+  // WF2
+  Map<Int,Map<String,Rat>> d_wf2 = map[Pair(25,d_wf2_25),Pair(50,d_wf2_50),Pair(75,d_wf2_75),Pair(100,d_wf2_100),Pair(125,d_wf2_125),Pair(150,d_wf2_150)];
+
+  // WF3
+  Map<Int,Map<String,Rat>> d_wf3 = map[Pair(25,d_wf3_25),Pair(50,d_wf3_50),Pair(75,d_wf3_75),Pair(100,d_wf3_100),Pair(125,d_wf3_125),Pair(150,d_wf3_150)];
+
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
+  // <WF , <RPS , <SERVICE , millicores>>>
+  Map<String,Map<Int,Map<String,Rat>>> typeD_calibrationMaps = map[Pair("wf1",d_wf1),Pair("wf2",d_wf2),Pair("wf3",d_wf3)];
+
 
   // Create some nodes
   Bool f1 = master.createNodes(1,4000,4000,0,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map

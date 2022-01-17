@@ -28,20 +28,20 @@ import * from ABS.DC;
   Map<String,Rat> a_wf1_50 = map[Pair("frontend",879),Pair("currencyservice",760),Pair("adservice",104),Pair("cartservice",129),Pair("productcatalogservice",94),Pair("redis-cart",18)];
   Map<String,Rat> a_wf1_75 = map[Pair("frontend",1079),Pair("currencyservice",971),Pair("adservice",133),Pair("cartservice",169),Pair("productcatalogservice",129),Pair("redis-cart",22)];
   Map<String,Rat> a_wf1_100 = map[Pair("frontend",1223),Pair("currencyservice",1079),Pair("adservice",157),Pair("cartservice",196),Pair("productcatalogservice",156),Pair("redis-cart",25)];
-  Map<String,Rat> a_wf1_125 = map[Pair("frontend",1327),Pair("currencyservice",1195),Pair("adservice",171),Pair("cartservice",194),Pair("productcatalogservice",173),Pair("redis-cart",22)];
-  Map<String,Rat> a_wf1_150 = map[Pair("frontend",1452),Pair("currencyservice",1268),Pair("adservice",172),Pair("cartservice",183),Pair("productcatalogservice",182),Pair("redis-cart",18)];
-  Map<String,Rat> a_wf1_175 = map[Pair("frontend",1560),Pair("currencyservice",1354),Pair("adservice",165),Pair("cartservice",166),Pair("productcatalogservice",176),Pair("redis-cart",14)];
-  Map<String,Rat> a_wf1_200 = map[Pair("frontend",1653),Pair("currencyservice",1470),Pair("adservice",146),Pair("cartservice",137),Pair("productcatalogservice",146),Pair("redis-cart",8)];
+  Map<String,Rat> a_wf1_125 = map[Pair("frontend",1327),Pair("currencyservice",1195),Pair("adservice",171),Pair("cartservice",208),Pair("productcatalogservice",173),Pair("redis-cart",22)];
+  Map<String,Rat> a_wf1_150 = map[Pair("frontend",1452),Pair("currencyservice",1268),Pair("adservice",172),Pair("cartservice",214),Pair("productcatalogservice",182),Pair("redis-cart",18)];
+  Map<String,Rat> a_wf1_175 = map[Pair("frontend",1560),Pair("currencyservice",1354),Pair("adservice",174),Pair("cartservice",219),Pair("productcatalogservice",186),Pair("redis-cart",14)];
+  Map<String,Rat> a_wf1_200 = map[Pair("frontend",1653),Pair("currencyservice",1470),Pair("adservice",176),Pair("cartservice",223),Pair("productcatalogservice",190),Pair("redis-cart",8)];
 
   // WF2
   Map<String,Rat> a_wf2_25 = map[Pair("frontend",558),Pair("currencyservice",436),Pair("adservice",72),Pair("cartservice",73),Pair("productcatalogservice",57),Pair("redis-cart",12)];
   Map<String,Rat> a_wf2_50 = map[Pair("frontend",945),Pair("currencyservice",760),Pair("adservice",107),Pair("cartservice",126),Pair("productcatalogservice",93),Pair("redis-cart",18)];
   Map<String,Rat> a_wf2_75 = map[Pair("frontend",1136),Pair("currencyservice",972),Pair("adservice",137),Pair("cartservice",167),Pair("productcatalogservice",126),Pair("redis-cart",22)];
   Map<String,Rat> a_wf2_100 = map[Pair("frontend",1288),Pair("currencyservice",1061),Pair("adservice",153),Pair("cartservice",185),Pair("productcatalogservice",151),Pair("redis-cart",24)];
-  Map<String,Rat> a_wf2_125 = map[Pair("frontend",1423),Pair("currencyservice",1123),Pair("adservice",170),Pair("cartservice",182),Pair("productcatalogservice",166),Pair("redis-cart",21)];
-  Map<String,Rat> a_wf2_150 = map[Pair("frontend",1544),Pair("currencyservice",1243),Pair("adservice",167),Pair("cartservice",158),Pair("productcatalogservice",164),Pair("redis-cart",15)];
-  Map<String,Rat> a_wf2_175 = map[Pair("frontend",1678),Pair("currencyservice",1350),Pair("adservice",148),Pair("cartservice",142),Pair("productcatalogservice",155),Pair("redis-cart",10)];
-  Map<String,Rat> a_wf2_200 = map[Pair("frontend",1723),Pair("currencyservice",1374),Pair("adservice",131),Pair("cartservice",129),Pair("productcatalogservice",143),Pair("redis-cart",8)];
+  Map<String,Rat> a_wf2_125 = map[Pair("frontend",1423),Pair("currencyservice",1123),Pair("adservice",170),Pair("cartservice",189),Pair("productcatalogservice",166),Pair("redis-cart",21)];
+  Map<String,Rat> a_wf2_150 = map[Pair("frontend",1544),Pair("currencyservice",1243),Pair("adservice",179),Pair("cartservice",192),Pair("productcatalogservice",172),Pair("redis-cart",15)];
+  Map<String,Rat> a_wf2_175 = map[Pair("frontend",1678),Pair("currencyservice",1350),Pair("adservice",184),Pair("cartservice",197),Pair("productcatalogservice",178),Pair("redis-cart",10)];
+  Map<String,Rat> a_wf2_200 = map[Pair("frontend",1723),Pair("currencyservice",1374),Pair("adservice",189),Pair("cartservice",201),Pair("productcatalogservice",181),Pair("redis-cart",8)];
 
   // WF3
   Map<String,Rat> a_wf3_25 = map[Pair("frontend",467),Pair("currencyservice",114),Pair("adservice",73),Pair("cartservice",73),Pair("productcatalogservice",276),Pair("recommendationservice",135),Pair("redis-cart",12)];
@@ -49,9 +49,9 @@ import * from ABS.DC;
   Map<String,Rat> a_wf3_75 = map[Pair("frontend",1024),Pair("currencyservice",271),Pair("adservice",138),Pair("cartservice",170),Pair("productcatalogservice",588),Pair("recommendationservice",314),Pair("redis-cart",22)];
   Map<String,Rat> a_wf3_100 = map[Pair("frontend",1121),Pair("currencyservice",319),Pair("adservice",158),Pair("cartservice",186),Pair("productcatalogservice",685),Pair("recommendationservice",381),Pair("redis-cart",24)];
   Map<String,Rat> a_wf3_125 = map[Pair("frontend",1222),Pair("currencyservice",361),Pair("adservice",168),Pair("cartservice",191),Pair("productcatalogservice",726),Pair("recommendationservice",435),Pair("redis-cart",22)];
-  Map<String,Rat> a_wf3_150 = map[Pair("frontend",1384),Pair("currencyservice",375),Pair("adservice",165),Pair("cartservice",165),Pair("productcatalogservice",815),Pair("recommendationservice",492),Pair("redis-cart",13)];
-  Map<String,Rat> a_wf3_175 = map[Pair("frontend",1436),Pair("currencyservice",347),Pair("adservice",151),Pair("cartservice",143),Pair("productcatalogservice",848),Pair("recommendationservice",494),Pair("redis-cart",8)];
-  Map<String,Rat> a_wf3_200 = map[Pair("frontend",1473),Pair("currencyservice",350),Pair("adservice",164),Pair("cartservice",139),Pair("productcatalogservice",872),Pair("recommendationservice",511),Pair("redis-cart",8)];
+  Map<String,Rat> a_wf3_150 = map[Pair("frontend",1384),Pair("currencyservice",375),Pair("adservice",173),Pair("cartservice",199),Pair("productcatalogservice",815),Pair("recommendationservice",462),Pair("redis-cart",13)];
+  Map<String,Rat> a_wf3_175 = map[Pair("frontend",1436),Pair("currencyservice",347),Pair("adservice",178),Pair("cartservice",207),Pair("productcatalogservice",848),Pair("recommendationservice",494),Pair("redis-cart",8)];
+  Map<String,Rat> a_wf3_200 = map[Pair("frontend",1473),Pair("currencyservice",350),Pair("adservice",182),Pair("cartservice",213),Pair("productcatalogservice",872),Pair("recommendationservice",511),Pair("redis-cart",8)];
 
   // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
   // WF1
@@ -67,9 +67,55 @@ import * from ABS.DC;
   // <WF , <RPS , <SERVICE , millicores>>>
   Map<String,Map<Int,Map<String,Rat>>> typeA_calibrationMaps = map[Pair("wf1",a_wf1),Pair("wf2",a_wf2),Pair("wf3",a_wf3)];
 
-  // Create some nodes
-  Bool fb = master.createNodes(4,4000,4000,0,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
+  //
+  // CREATING A NODE CALIBRATION TABLE FOR A NODE TYPE C
+  //
 
+  // most inner maps: one map for every RPS entry, the map specifies the millicores cost for every service involved
+  // WF1
+  Map<String,Rat> c_wf1_25 = map[Pair("frontend",494),Pair("currencyservice",412),Pair("productcatalogservice",52)];
+  Map<String,Rat> c_wf1_50 = map[Pair("frontend",911),Pair("currencyservice",744),Pair("productcatalogservice",88)];
+  Map<String,Rat> c_wf1_75 = map[Pair("frontend",1220),Pair("currencyservice",1001),Pair("productcatalogservice",120)];
+  Map<String,Rat> c_wf1_100 = map[Pair("frontend",1411),Pair("currencyservice",1163),Pair("productcatalogservice",154)];
+  Map<String,Rat> c_wf1_125 = map[Pair("frontend",1565),Pair("currencyservice",1311),Pair("productcatalogservice",181)];
+  Map<String,Rat> c_wf1_150 = map[Pair("frontend",1634),Pair("currencyservice",1382),Pair("productcatalogservice",201)];
+
+  // WF2
+  Map<String,Rat> c_wf2_25 = map[Pair("frontend",512),Pair("currencyservice",399),Pair("productcatalogservice",51)];
+  Map<String,Rat> c_wf2_50 = map[Pair("frontend",1011),Pair("currencyservice",776),Pair("productcatalogservice",93)];
+  Map<String,Rat> c_wf2_75 = map[Pair("frontend",1318),Pair("currencyservice",1027),Pair("productcatalogservice",126)];
+  Map<String,Rat> c_wf2_100 = map[Pair("frontend",1495),Pair("currencyservice",1189),Pair("productcatalogservice",158)];
+  Map<String,Rat> c_wf2_125 = map[Pair("frontend",1633),Pair("currencyservice",1247),Pair("productcatalogservice",180)];
+  Map<String,Rat> c_wf2_150 = map[Pair("frontend",1734),Pair("currencyservice",1352),Pair("productcatalogservice",193)];
+
+  // WF3
+  Map<String,Rat> c_wf3_25 = map[Pair("frontend",487),Pair("currencyservice",116),Pair("productcatalogservice",280),Pair("recommendationservice",150)];
+  Map<String,Rat> c_wf3_50 = map[Pair("frontend",874),Pair("currencyservice",202),Pair("productcatalogservice",482),Pair("recommendationservice",251)];
+  Map<String,Rat> c_wf3_75 = map[Pair("frontend",1167),Pair("currencyservice",292),Pair("productcatalogservice",651),Pair("recommendationservice",361)];
+  Map<String,Rat> c_wf3_100 = map[Pair("frontend",1337),Pair("currencyservice",339),Pair("productcatalogservice",733),Pair("recommendationservice",422)];
+  Map<String,Rat> c_wf3_125 = map[Pair("frontend",1411),Pair("currencyservice",381),Pair("productcatalogservice",773),Pair("recommendationservice",480)];
+  Map<String,Rat> c_wf3_150 = map[Pair("frontend",1425),Pair("currencyservice",395),Pair("productcatalogservice",798),Pair("recommendationservice",511)];
+
+  // 2nd level maps: given a RPS value (Int), it returns the inner map with the cost for every service involved
+  // WF1
+  Map<Int,Map<String,Rat>> c_wf1 = map[Pair(25,c_wf1_25),Pair(50,c_wf1_50),Pair(75,c_wf1_75),Pair(100,c_wf1_100),Pair(125,c_wf1_125),Pair(150,c_wf1_150)];
+
+  // WF2
+  Map<Int,Map<String,Rat>> c_wf2 = map[Pair(25,c_wf2_25),Pair(50,c_wf2_50),Pair(75,c_wf2_75),Pair(100,c_wf2_100),Pair(125,c_wf2_125),Pair(150,c_wf2_150)];
+
+  // WF3
+  Map<Int,Map<String,Rat>> c_wf3 = map[Pair(25,c_wf3_25),Pair(50,c_wf3_50),Pair(75,c_wf3_75),Pair(100,c_wf3_100),Pair(125,c_wf3_125),Pair(150,c_wf3_150)];
+
+  // Full calibration map for a node type, associates every workflow with its 2nd level map
+  // <WF , <RPS , <SERVICE , millicores>>>
+  Map<String,Map<Int,Map<String,Rat>>> typeC_calibrationMaps = map[Pair("wf1",c_wf1),Pair("wf2",c_wf2),Pair("wf3",c_wf3)];
+
+
+  // Create some nodes
+  Bool f1 = master.createNodes(1,4000,4000,150,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
+  Bool f2 = master.createNodes(1,4000,4000,0,typeC_calibrationMaps);
+  Bool f3 = master.createNodes(1,4000,4000,150,typeA_calibrationMaps); // Number of nodes, CPU capacity, Memory capacity, Base system load, calibration map
+  Bool f4 = master.createNodes(1,4000,4000,0,typeC_calibrationMaps);
   //
   // SERVICES CREATION
   //
@@ -81,23 +127,23 @@ import * from ABS.DC;
   PodConfig emailservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
   ServiceConfig checkoutserviceServiceConfig = ServiceConfig("checkoutservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig checkoutservicePodConfig = PodConfig(1, 0, 250, 400, costGranularity);
-  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 8, 8, 8, 1, 80/100, 5/100, 10);
+  ServiceConfig recommendationserviceServiceConfig = ServiceConfig("recommendationservice", 10, 10, 10, 1, 80/100, 5/100, 10);
   PodConfig recommendationservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
-  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 8, 8, 8, 1, 80/100, 5/100, 10);
+  ServiceConfig frontendServiceConfig = ServiceConfig("frontend", 10, 10, 10, 1, 80/100, 5/100, 10);
   PodConfig frontendPodConfig = PodConfig(1, 0, 250, 3000, costGranularity);
   ServiceConfig paymentserviceServiceConfig = ServiceConfig("paymentservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig paymentservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
   ServiceConfig productcatalogserviceServiceConfig = ServiceConfig("productcatalogservice", 8, 8, 8, 1, 80/100, 5/100, 10);
   PodConfig productcatalogservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
-  ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  ServiceConfig cartserviceServiceConfig = ServiceConfig("cartservice", 2, 2, 2, 1, 80/100, 5/100, 10);
   PodConfig cartservicePodConfig = PodConfig(1, 0, 150, 400, costGranularity);
   ServiceConfig currencyserviceServiceConfig = ServiceConfig("currencyservice", 8, 8, 8, 1, 80/100, 5/100, 10);
   PodConfig currencyservicePodConfig = PodConfig(1, 0, 250, 2000, costGranularity);
   ServiceConfig shippingserviceServiceConfig = ServiceConfig("shippingservice", 2, 1, 30, 1, 80/100, 5/100, 10);
   PodConfig shippingservicePodConfig = PodConfig(1, 0, 100, 500, costGranularity);
-  ServiceConfig rediscartServiceConfig = ServiceConfig("redis-cart", 4, 4, 4, 1, 80/100, 5/100, 10);
+  ServiceConfig rediscartServiceConfig = ServiceConfig("redis-cart", 2, 2, 2, 1, 80/100, 5/100, 10);
   PodConfig rediscartPodConfig = PodConfig(1, 0, 220, 325, costGranularity);
-  ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 4, 4, 4, 1, 80/100, 5/100, 10);
+  ServiceConfig adserviceServiceConfig = ServiceConfig("adservice", 2, 2, 2, 1, 80/100, 5/100, 10);
   PodConfig adservicePodConfig = PodConfig(1, 0, 350, 400, costGranularity);
 
   // map containing the rules for pods scheduling. If specified for a service, every time the a new pod is deployed
@@ -105,13 +151,13 @@ import * from ABS.DC;
   // These lists are circular, once the end is reached the schedule will start over from the first element.
   // The specified numbers in the lists are the Node-IDs.
   Map<String,List<Int>> rulesMap = map[];
-  rulesMap = put(rulesMap,"frontend",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"frontend",list[1,2,3,4,2,4]);
   rulesMap = put(rulesMap,"currencyservice",list[1,2,3,4]);
-  rulesMap = put(rulesMap,"adservice",list[1,2,3,4]);
-  rulesMap = put(rulesMap,"cartservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"adservice",list[1,3]);
+  rulesMap = put(rulesMap,"cartservice",list[1,3]);
   rulesMap = put(rulesMap,"productcatalogservice",list[1,2,3,4]);
-  rulesMap = put(rulesMap,"redis-cart",list[1,2,3,4]);
-  rulesMap = put(rulesMap,"recommendationservice",list[1,2,3,4]);
+  rulesMap = put(rulesMap,"redis-cart",list[1,3]);
+  rulesMap = put(rulesMap,"recommendationservice",list[1,2,3,4,2,4]);
 
   master.setSchedulerRulesMap(rulesMap); // set it in in the master
 
