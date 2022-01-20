@@ -580,11 +580,13 @@ class NodeSchedulerObject(CloudProvider cloud, MasterLoadbalancer mlb, Int loadP
   Bool createNodes(Int nNodes, Map<String,Map<Int,Map<String,Rat>>> calibrationMaps,
                    Rat cpu, Rat memory, Rat timeUnitSize, Rat baseSysConsumption, Int costGranularity){
     Int ctr = 0;
+    Map<String,Map<Int,Map<String,Rat>>> normCalMaps = this.addExtremeValueCalibrationMaps(calibrationMaps,4);
+
     while (ctr < nNodes) {
       NodeResourcesMonitor monitor = new NodeResourcesMonitorObject(resourceCycle,cpu,memory);
       Node node = new NodeObject(nextID, cpu, memory, timeUnitSize, resourceCycle,
                                  baseSysConsumption, monitor, costGranularity,
-                                 mlb, calibrationMaps);
+                                 mlb, normCalMaps);
       await monitor!setNode(node);
       nodes = appendright(nodes,node);
       activeNodes = appendright(activeNodes,node);
@@ -596,6 +598,42 @@ class NodeSchedulerObject(CloudProvider cloud, MasterLoadbalancer mlb, Int loadP
     }
     println("[Time: "+toString(timeValue(now()))+"] *********** CREATED "+toString(nNodes)+" NODES [CPU: " + toString(cpu) + " - " + "MEMORY: " + toString(memory) + " ]");
     return True;
+  }
+
+  Map<String,Map<Int,Map<String,Rat>>> addExtremeValueCalibrationMaps(Map<String,Map<Int,Map<String,Rat>>> calibrationMaps, Int factor){
+    List<String> workflows = elements(keys(calibrationMaps));
+    Map<String,Map<Int,Map<String,Rat>>> newCalibMaps = map[];
+
+    foreach (wf in workflows){
+      Map<Int,Map<String,Rat>> wfEntMap = lookupDefault(calibrationMaps,wf,map[]);
+      List<Int> rpsEntries = elements(keys(wfEntMap));
+      //Map<Int,Map<String,Rat>> newWfEntMap = map[];
+      Int maxRps = -1;
+      Map<String,Rat> maxRpsCsnmptions = map[];
+      Map<String,Rat> maxRpsCsnmptions_xfactor = map[];
+      List<String> services = list[];
+      Map<String,Rat> rpsEntMap = map [];
+
+      foreach (rps in rpsEntries){
+        rpsEntMap = lookupDefault(wfEntMap,rps,map[]);
+        if (rps > maxRps) {
+          maxRps = rps;
+        }
+      }
+      maxRpsCsnmptions = lookupDefault(wfEntMap,maxRps,map[]);
+      services = elements(keys(maxRpsCsnmptions));
+      foreach (service in services){
+        Rat newMax = lookupDefault(maxRpsCsnmptions,service,0)*factor;
+        maxRpsCsnmptions_xfactor = put(maxRpsCsnmptions_xfactor,service,newMax);
+      }
+      Int newRps = maxRps*factor;
+
+      wfEntMap = put(wfEntMap,newRps,maxRpsCsnmptions_xfactor);
+
+
+      newCalibMaps = put(newCalibMaps,wf,wfEntMap);
+    }
+    return newCalibMaps;
   }
 
   //returns the node with more not requested cpu available
